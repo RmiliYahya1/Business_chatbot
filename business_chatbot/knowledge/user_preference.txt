@@ -1,4 +1,4 @@
-User name is John Doe.
-User is an AI Engineer.
-User is interested in AI Agents.
-User is based in San Francisco, California.
+Users names are Salhi Abdelmounaim and Rmili Yahya.
+Users are an AI Engineer.
+Users are interested in AI Agents.
+Users are based in Morocco Marrakech, Rachida .
