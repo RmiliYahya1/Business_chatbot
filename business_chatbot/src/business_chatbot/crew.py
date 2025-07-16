@@ -20,9 +20,9 @@ class BusinessChatbot():
     # If you would like to add tools to your agents, you can learn more about it here:
     # https://docs.crewai.com/concepts/agents#agent-tools
     @agent
-    def researcher(self) -> Agent:
+    def business_expert(self) -> Agent:
         return Agent(
-            config=self.agents_config['researcher'], # type: ignore[index]
+            config=self.agents_config['business_expert'], # type: ignore[index]
             verbose=True
         )
 
