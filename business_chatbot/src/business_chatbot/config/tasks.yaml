@@ -1,17 +1,27 @@
-research_task:
+generate_final_response:
   description: >
-    Conduct a thorough research about {topic}
-    Make sure you find any interesting and relevant information given
-    the current year is {current_year}.
-  expected_output: >
-    A list with 10 bullet points of the most relevant information about {topic}
-  agent: researcher
+    Cette tâche est la dernière étape du processus de traitement d’une demande utilisateur.
+    Elle a pour objectif de générer une réponse finale personnalisée à afficher dans l’interface, en tenant compte du contexte business détecté.
+    En te basant sur :
+    - L’input textuel initial fourni par l’utilisateur,
+    - Éventuellement, des données structurées JSON générées par un agent B2B ou B2C (et passées comme contexte),
+    - Et, si disponible, un lien vers un fichier CSV à inclure dans la réponse,
 
-reporting_task:
-  description: >
-    Review the context you got and expand each topic into a full section for a report.
-    Make sure the report is detailed and contains any and all relevant information.
+   Génère une réponse contextualisée, professionnelle et exploitable.
+    Commence par analyser le message de l'utilisateur pour identifier son besoin ou son intention.
+    Si des données structurées (sous forme JSON) issues de l'analyse B2B ou B2C sont présentes, utilise-les pour enrichir la réponse.
+    Si aucun contexte n’est fourni, base-toi uniquement sur l’input texte.
+    
+    La réponse générée sera présentée directement à l’utilisateur final dans l’interface.
+    Elle doit être claire, orientée solution, et adaptée à un profil B2B ou B2C si identifiable.
+    Si un fichier CSV est fourni, mentionne-le clairement avec un lien de téléchargement.
   expected_output: >
-    A fully fledged report with the main topics, each with a full section of information.
-    Formatted as markdown without '```'
-  agent: reporting_analyst
+   Une réponse textuelle rédigée en langage professionnel, incluant :
+    - Une synthèse claire de l’intention de l’utilisateur
+    - Une réponse adaptée au contexte business, enrichie de données si disponibles
+    - Une mention explicite du fichier CSV si présent, avec un lien intégré ([Télécharger les données](lien.csv))
+    Format attendu : texte markdown, maximum 300 mots.
+    Le ton doit être clair, marketing et orienté solution.
+    Le texte doit être compréhensible par un professionnel non technique, avec un ton marketing et décisionnel.
+  agent: business_expert
+
