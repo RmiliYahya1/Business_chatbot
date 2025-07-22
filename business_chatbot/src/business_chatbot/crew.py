@@ -17,7 +17,7 @@ if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY environment variable not set. Please check your .env file.")
 
 @CrewBase
-class BusinessChatbot():
+class BusinessChatbot:
     """BusinessChatbot crew"""
     agents: List[BaseAgent]
     tasks: List[Task]
@@ -29,34 +29,57 @@ class BusinessChatbot():
         return Agent(
             config=self.agents_config['business_expert'],
             llm= MODEL,
+            allow_delegation=False,
             verbose=True
         )
 
-
+    @agent
+    def b2b_specialist(self) -> Agent:
+        return Agent(
+            config=self.agents_config['b2b_specialist'],
+            llm= MODEL,
+            allow_delegation=False,
+            verbose=True
+        )
+    @agent
+    def b2c_specialist(self) -> Agent:
+        return Agent(
+            config=self.agents_config['b2c_specialist'],
+            llm= MODEL,
+            allow_delegation=False,
+            verbose=True
+        )
     # To learn more about structured task outputs,
     # task dependencies, and task callbacks, check out the documentation:
     # https://docs.crewai.com/concepts/tasks#overview-of-a-task
     @task
-    def research_task(self) -> Task:
+    def generate_final_response(self) -> Task:
         return Task(
-            config=self.tasks_config['research_task'], # type: ignore[index]
+            config=self.tasks_config['generate_final_response'], # type: ignore[index]
         )
 
     @task
-    def reporting_task(self) -> Task:
+    def b2b_retreiving(self) -> Task:
         return Task(
-            config=self.tasks_config['reporting_task'], # type: ignore[index]
+            config=self.tasks_config['b2b_retreiving'], # type: ignore[index]
+            output_file='report.md'
+        )
+
+    @task
+    def b2c_retreiving(self) -> Task:
+        return Task(
+            config=self.tasks_config['b2c_retreiving'],  # type: ignore[index]
             output_file='report.md'
         )
 
     @crew
-    def crew(self) -> Crew:
+    def crew(self,agent) -> Crew:
         """Creates the BusinessChatbot crew"""
         # To learn how to add knowledge sources to your crew, check out the documentation:
         # https://docs.crewai.com/concepts/knowledge#what-is-knowledge
 
         return Crew(
-            agents=self.agents, # Automatically created by the @agent decorator
+            agents=agent, # Automatically created by the @agent decorator
             tasks=self.tasks, # Automatically created by the @task decorator
             process=Process.sequential,
             verbose=True,

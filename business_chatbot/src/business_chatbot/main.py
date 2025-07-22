@@ -1,29 +1,81 @@
 #!/usr/bin/env python
 import sys
 import warnings
-
+import requests
 from datetime import datetime
-
-from business_chatbot.crew import BusinessChatbot
-
+import pandas as pd
+import json
+from business_chatbot.src.business_chatbot.crew import BusinessChatbot
+from flask import Flask, jsonify, request, abort
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
-
+from  flask_cors import CORS
 # This main file is intended to be a way for you to run your
 # crew locally, so refrain from adding unnecessary logic into this file.
 # Replace with inputs you want to test with, it will automatically
 # interpolate any tasks and agents information
+agents=BusinessChatbot()
+b2b_api_url = "http://15.236.152.46:8080/api/b2b/searchByAttrExact"  # @param {type:"string"}
+b2c_api_url = "http://15.236.152.46:8080/api/b2c/searchByAttrExact"
+# Proper variable assignment for payload
+payload = {
 
-def run():
-    """
-    Run the crew.
-    """
-    inputs = {
-        'topic': 'AI LLMs',
-        'current_year': str(datetime.now().year)
-    }
-    
+}
+
+headers = {
+    "Content-Type": "application/json",
+    "Accept": "*/*"
+}
+
+params = {'page': 0, 'size': 130000, 'sortBy': '_score', 'direction': 'desc'}
+
+def make_post_request(url, payload, headers, params):
+    """Make POST request and handle response"""
     try:
-        BusinessChatbot().crew().kickoff(inputs=inputs)
+        print(f"Making POST request to {url}...")
+        print(f"Payload: {json.dumps(payload, indent=2)}")
+
+        response = requests.post(url, json=payload, headers=headers, timeout=30, params=params)
+        response.raise_for_status()
+
+        print(f"Success! Status Code: {response.status_code}")
+
+        try:
+            return response.json()
+        except ValueError:
+            print("Response is not JSON, returning raw text")
+            return {"raw_response": response.text}
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error making request: {str(e)}")
+        return {"error": str(e), "type": type(e).__name__}
+
+
+app= Flask(__name__)
+CORS(app)
+CORS(app, resources={r"/api/crew": {"origins": "http://localhost:3000"}})
+@app.route('/api/crew', methods=['POST'])
+def run():
+    data = request.get_json()
+    user_input = data.get('input')
+    choosed_Agent = data.get('choice')
+    if not user_input or not choosed_Agent:
+        return jsonify({'error': 'No input provided'}), 400
+    try:
+        if choosed_Agent == 1 :
+         result = BusinessChatbot().crew(agents.generate_final_response).kickoff(inputs=user_input)
+         df = pd.DataFrame(result)
+         return df.to_csv(index=False, encoding='utf-8')
+        elif choosed_Agent == 2 :
+         query = BusinessChatbot().crew(agents.b2b_specialist).kickoff(inputs=user_input)
+         result=make_post_request(b2b_api_url, query, headers, params)
+         df = pd.DataFrame(result)
+         return df.to_csv(index=False, encoding='utf-8')
+        else:
+         query = BusinessChatbot().crew(agents.b2c_specialist).kickoff(inputs=user_input)
+         result = make_post_request(b2c_api_url, query, headers, params)
+        return jsonify({
+          'response': result, })
+
     except Exception as e:
         raise Exception(f"An error occurred while running the crew: {e}")
 
@@ -66,3 +118,7 @@ def test():
 
     except Exception as e:
         raise Exception(f"An error occurred while testing the crew: {e}")
+
+
+if __name__ == '__main__':
+    app.run(debug=True, port=3001)
