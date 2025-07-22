@@ -28,3 +28,45 @@ direct_consultation:
   guardrail: Vérifier que la réponse ne mentionne aucun fichier CSV ou données externes.
   output_file: "direct_response.md"
 
+data_analysis_synthesis:
+  description: >
+    Interpréter et synthétiser des données CSV B2B ou B2C générées par les agents spécialisés,
+    puis créer une réponse enrichie pour l'utilisateur final.
+    
+    Cette tâche est activée quand un bouton (B2B ou B2C) est sélectionné et que des données
+    structurées sont disponibles via le contexte de la tâche.
+    
+    Processus à suivre :
+    1. Analyser l'input utilisateur original pour comprendre son besoin
+    2. Examiner les données CSV fournies dans le contexte
+    3. Extraire les insights clés et tendances significatives
+    4. Corréler les données avec la demande utilisateur initiale
+    5. Synthétiser les findings en recommandations business
+    6. Intégrer le lien de téléchargement CSV dans la réponse finale
+    
+    Priorité à l'interprétation métier des données techniques.
+    La valeur ajoutée réside dans la transformation d'insights data en stratégies exploitables.
+  expected_output: >
+    Une réponse analytique complète en format markdown avec des titres pertinents choisis par l'agent.
+    
+    Structure recommandée (titres à adapter selon le contexte et les données) :
+    - Une section de contextualisation de l'analyse
+    - Une section de synthèse des insights clés extraits des données
+    - Une section d'interprétation business des tendances identifiées
+    - Une section de recommandations stratégiques basées sur les données
+    - Mention explicite du fichier CSV avec lien : "📊 [Télécharger les données complètes](lien_csv)"
+    
+    L'agent doit choisir des titres de sections (## Titre) qui reflètent naturellement 
+    les insights découverts et le type d'analyse B2B/B2C effectuée.
+    
+    Contraintes :
+    - Maximum 350 mots
+    - Ton analytique mais accessible
+    - Utiliser des titres markdown appropriés (## Titre)  
+    - Focus sur l'actionnable business
+    - Lien CSV obligatoire et bien visible
+  agent: business_expert
+  context: []  # Sera rempli dynamiquement avec les données CSV
+  guardrail: "Vérifier que la réponse inclut une analyse des données CSV, et contient un lien de téléchargement clairement visible"
+  markdown: true
+  output_file: "analysis_response.md"
