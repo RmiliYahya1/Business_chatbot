@@ -1,27 +1,30 @@
-generate_final_response:
+direct_consultation:
   description: >
-    Cette tâche est la dernière étape du processus de traitement d’une demande utilisateur.
-    Elle a pour objectif de générer une réponse finale personnalisée à afficher dans l’interface, en tenant compte du contexte business détecté.
-    En te basant sur :
-    - L’input textuel initial fourni par l’utilisateur,
-    - Éventuellement, des données structurées JSON générées par un agent B2B ou B2C (et passées comme contexte),
-    - Et, si disponible, un lien vers un fichier CSV à inclure dans la réponse,
+    Réponds à la demande suivante de l'utilisateur : {demande}
+    Analyser la demande textuelle de l'utilisateur et fournir une réponse experte immédiate
+    en tant qu'analyste senior en marketing data et intelligence commerciale.
 
-   Génère une réponse contextualisée, professionnelle et exploitable.
-    Commence par analyser le message de l'utilisateur pour identifier son besoin ou son intention.
-    Si des données structurées (sous forme JSON) issues de l'analyse B2B ou B2C sont présentes, utilise-les pour enrichir la réponse.
-    Si aucun contexte n’est fourni, base-toi uniquement sur l’input texte.
-    
-    La réponse générée sera présentée directement à l’utilisateur final dans l’interface.
-    Elle doit être claire, orientée solution, et adaptée à un profil B2B ou B2C si identifiable.
-    Si un fichier CSV est fourni, mentionne-le clairement avec un lien de téléchargement.
+    Cette tâche est activée quand AUCUN bouton (B2B/B2C) n'est sélectionné.
+    L'utilisateur pose une question générale nécessitant des conseils stratégiques immédiats.
+
+    Processus à suivre :
+    1. Analyser l'intention et le contexte de la demande utilisateur
+    2. Identifier le domaine d'expertise requis (marketing, BI, comportement d'achat)
+    3. Générer une réponse  directe basée sur ton expertise
+    4. Adapter le ton et le niveau technique à l'audience identifiée
+
+    La réponse doit être autonome, sans référence à des données externes ou fichiers.
+    Focus sur les conseils pratiques et actionnables.
   expected_output: >
-   Une réponse textuelle rédigée en langage professionnel, incluant :
-    - Une synthèse claire de l’intention de l’utilisateur
-    - Une réponse adaptée au contexte business, enrichie de données si disponibles
-    - Une mention explicite du fichier CSV si présent, avec un lien intégré ([Télécharger les données](lien.csv))
-    Format attendu : texte markdown, maximum 300 mots.
-    Le ton doit être clair, marketing et orienté solution.
-    Le texte doit être compréhensible par un professionnel non technique, avec un ton marketing et décisionnel.
+    Une réponse consultative complète en format markdown avec des titres pertinents choisis par l'agent.
+    Structure recommandée (titres à adapter selon le contexte) :
+    - Une section de synthèse/compréhension de la demande
+    - Une section d'analyse experte du contexte business  
+    - Une section de recommandations stratégiques concrètes
+    - Une section d'actions prioritaires si applicable
+    L'agent doit choisir des titres de sections (## Titre) qui correspondent naturellement 
+    au sujet traité et au contexte business identifié.
   agent: business_expert
+  guardrail: Vérifier que la réponse ne mentionne aucun fichier CSV ou données externes.
+  output_file: "direct_response.md"
 

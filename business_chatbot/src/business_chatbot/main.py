@@ -1,68 +1,49 @@
 #!/usr/bin/env python
 import sys
 import warnings
-
 from datetime import datetime
-
-from business_chatbot.crew import BusinessChatbot
+from crew import BusinessChatbot
 
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 
-# This main file is intended to be a way for you to run your
-# crew locally, so refrain from adding unnecessary logic into this file.
-# Replace with inputs you want to test with, it will automatically
-# interpolate any tasks and agents information
-
 def run():
     """
-    Run the crew.
+    Run the crew with user input for direct consultation.
     """
-    inputs = {
-        'topic': 'AI LLMs',
-        'current_year': str(datetime.now().year)
-    }
-    
-    try:
-        BusinessChatbot().crew().kickoff(inputs=inputs)
-    except Exception as e:
-        raise Exception(f"An error occurred while running the crew: {e}")
+    print("=== Test de l'agent business_expert - Consultation Directe ===")
+    user_input = input("Entrez votre question business/marketing : ").strip()
 
+    if not user_input:
+        print("Erreur : aucun input utilisateur fourni.")
+        return
 
-def train():
-    """
-    Train the crew for a given number of iterations.
-    """
-    inputs = {
-        "topic": "AI LLMs",
-        'current_year': str(datetime.now().year)
-    }
+    chatbot_crew = BusinessChatbot().crew()
+    inputs = {'demande': user_input}
+
+    print("Mode consultation directe sélectionné.")
+
     try:
-        BusinessChatbot().crew().train(n_iterations=int(sys.argv[1]), filename=sys.argv[2], inputs=inputs)
+        # Since only direct_consultation_task is active, it will be the only task in the crew's list
+        # and will be executed by default when kickoff is called.
+        print("Lancement du crew pour consultation directe...")
+        result = chatbot_crew.kickoff(inputs=inputs)
+        print("\n--- Réponse de l'agent ---\n")
+        print(result)
 
     except Exception as e:
-        raise Exception(f"An error occurred while training the crew: {e}")
+        print(f"\nUne erreur est survenue pendant l'exécution du crew : {e}")
 
 def replay():
     """
     Replay the crew execution from a specific task.
     """
     try:
+        # If you only have one task, the task_id might be predictable or you can adapt this.
         BusinessChatbot().crew().replay(task_id=sys.argv[1])
-
     except Exception as e:
-        raise Exception(f"An error occurred while replaying the crew: {e}")
+        print(f"Erreur lors du replay : {e}")
 
-def test():
-    """
-    Test the crew execution and returns the results.
-    """
-    inputs = {
-        "topic": "AI LLMs",
-        "current_year": str(datetime.now().year)
-    }
-    
-    try:
-        BusinessChatbot().crew().test(n_iterations=int(sys.argv[1]), eval_llm=sys.argv[2], inputs=inputs)
 
-    except Exception as e:
-        raise Exception(f"An error occurred while testing the crew: {e}")
+
+if __name__ == "__main__":
+    run()
