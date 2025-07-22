@@ -1,64 +1,49 @@
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
-from crewai.agents.agent_builder.base_agent import BaseAgent
+from crewai_tools import SerperDevTool, WebsiteSearchTool
 from typing import List
 import os
 from dotenv import load_dotenv
-# If you want to run a snippet of code before or after the crew starts,
-# you can use the @before_kickoff and @after_kickoff decorators
-# https://docs.crewai.com/concepts/crews#example-crew-class-with-decorators
 
 load_dotenv()
 MODEL = os.getenv('MODEL')
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-if not MODEL:
-    raise ValueError("MODEL environment variable not set. Please check your .env file.")
-if not OPENAI_API_KEY:
-    raise ValueError("OPENAI_API_KEY environment variable not set. Please check your .env file.")
+
 
 @CrewBase
 class BusinessChatbot():
     """BusinessChatbot crew"""
-    agents: List[BaseAgent]
-    tasks: List[Task]
-    
-    # If you would like to add tools to your agents, you can learn more about it here:
-    # https://docs.crewai.com/concepts/agents#agent-tools
+    agents_config = "config/agents.yaml"
+    tasks_config = "config/tasks.yaml"  # IMPORTANT: Ajout manquant
+
+    search_tool = SerperDevTool()
+    website_search = WebsiteSearchTool()
+
     @agent
     def business_expert(self) -> Agent:
         return Agent(
             config=self.agents_config['business_expert'],
-            llm= MODEL,
-            verbose=True
-        )
-
-
-    # To learn more about structured task outputs,
-    # task dependencies, and task callbacks, check out the documentation:
-    # https://docs.crewai.com/concepts/tasks#overview-of-a-task
-    @task
-    def research_task(self) -> Task:
-        return Task(
-            config=self.tasks_config['research_task'], # type: ignore[index]
+            llm=MODEL,
+            allow_delegation=False,
+            memory=True,
+            verbose=True,
+            respect_context_window=False,
+            max_iter=5,
+            tools=[self.search_tool, self.website_search]
         )
 
     @task
-    def reporting_task(self) -> Task:
+    def direct_consultation_task(self) -> Task:
         return Task(
-            config=self.tasks_config['reporting_task'], # type: ignore[index]
-            output_file='report.md'
+            config=self.tasks_config['direct_consultation'],
+            agent=self.business_expert()  # IMPORTANT: Assignation explicite
         )
 
     @crew
     def crew(self) -> Crew:
         """Creates the BusinessChatbot crew"""
-        # To learn how to add knowledge sources to your crew, check out the documentation:
-        # https://docs.crewai.com/concepts/knowledge#what-is-knowledge
-
         return Crew(
-            agents=self.agents, # Automatically created by the @agent decorator
-            tasks=self.tasks, # Automatically created by the @task decorator
+            agents=self.agents,
+            tasks=self.tasks,
             process=Process.sequential,
-            verbose=True,
-            # process=Process.hierarchical, # In case you wanna use that instead https://docs.crewai.com/how-to/Hierarchical/
+            verbose=True
         )
