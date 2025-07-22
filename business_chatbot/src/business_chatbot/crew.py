@@ -27,7 +27,7 @@ class BusinessChatbot():
             memory=True,
             verbose=True,
             respect_context_window=False,
-            max_iter=5,
+            max_iter=3,
             tools=[self.search_tool, self.website_search]
         )
 
@@ -35,7 +35,14 @@ class BusinessChatbot():
     def direct_consultation_task(self) -> Task:
         return Task(
             config=self.tasks_config['direct_consultation'],
-            agent=self.business_expert()  # IMPORTANT: Assignation explicite
+            agent=self.business_expert()
+        )
+
+    @task
+    def data_analysis_synthesis_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['data_analysis_synthesis'],
+            agent=self.business_expert()
         )
 
     @crew

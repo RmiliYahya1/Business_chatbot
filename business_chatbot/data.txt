@@ -1,0 +1,13 @@
+ID_Lead,Nom_Entreprise,Secteur_Activité,Pays,Produit_Intéressé,Taille_Contrat_USD,Étape_Vente,Source_Lead,Date_Création
+LEAD001,Innovatech SARL,Technologie,France,CRM Pro,50000,Qualification,Webinar,2025-07-01
+LEAD002,Global Logistics,Transport,Allemagne,Analytics Suite,120000,Proposal,Referral,2025-07-02
+LEAD003,SantéPlus Cliniques,Santé,Espagne,Cloud Storage,25000,Prospect,Website,2025-07-02
+LEAD004,BuildIt Constructions,Construction,France,CRM Pro,45000,Negotiation,Cold Call,2025-07-03
+LEAD005,Financia Banque,Finance,Italie,Analytics Suite,250000,Closed Won,Referral,2025-07-05
+LEAD006,AutoMotion GmbH,Industrie,Allemagne,ERP Master,350000,Proposal,Website,2025-07-06
+LEAD007,La Plume Média,Médias,France,Cloud Storage,15000,Closed Lost,Webinar,2025-07-08
+LEAD008,AgriCorp,Agriculture,Espagne,CRM Pro,65000,Qualification,Website,2025-07-10
+LEAD009,Tech Services UK,Technologie,Royaume-Uni,Analytics Suite,95000,Negotiation,Referral,2025-07-11
+LEAD010,MedicaPharma,Santé,Allemagne,ERP Master,450000,Prospect,Cold Call,2025-07-12
+LEAD011,EuroRetail,Distribution,France,CRM Pro,75000,Proposal,Website,2025-07-15
+LEAD012,Finance Consult,Finance,Royaume-Uni,Analytics Suite,180000,Qualification,Webinar,2025-07-16
