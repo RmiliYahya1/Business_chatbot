@@ -32,17 +32,19 @@ data_analysis_synthesis:
   description: >
     Interpréter et synthétiser des données CSV B2B ou B2C générées par les agents spécialisés,
     puis créer une réponse enrichie pour l'utilisateur final.
+    Les données brutes sont fournies dans le contexte : {csv_data}.
     
     Cette tâche est activée quand un bouton (B2B ou B2C) est sélectionné et que des données
     structurées sont disponibles via le contexte de la tâche.
     
     Processus à suivre :
-    1. Analyser l'input utilisateur original pour comprendre son besoin
-    2. Examiner les données CSV fournies dans le contexte
+    1. Analyser l'input utilisateur original pour comprendre son besoin  : {demande}
+    2. Examiner les données CSV fournies : {csv_data}
     3. Extraire les insights clés et tendances significatives
-    4. Corréler les données avec la demande utilisateur initiale
-    5. Synthétiser les findings en recommandations business
-    6. Intégrer le lien de téléchargement CSV dans la réponse finale
+    4.**IMPORTANT : Utilise l'outil 'CSV File Creator' pour sauvegarder les données {csv_data} dans un fichier.**
+    5. Corréler les données avec la demande utilisateur initiale
+    6. Synthétiser les findings en recommandations business
+    7. Intégrer le lien de téléchargement du fichier CSV fournies dans le contexte dans la réponse finale
     
     Priorité à l'interprétation métier des données techniques.
     La valeur ajoutée réside dans la transformation d'insights data en stratégies exploitables.
