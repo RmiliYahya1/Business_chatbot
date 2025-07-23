@@ -1,34 +1,33 @@
 from crewai import Agent, Crew, Process, Task
-from crewai.project import CrewBase, agent, crew, task
 from crewai.agents.agent_builder.base_agent import BaseAgent
+from crewai.project import CrewBase, agent, crew, task
 from typing import List
 import os
 from dotenv import load_dotenv
-# If you want to run a snippet of code before or after the crew starts,
-# you can use the @before_kickoff and @after_kickoff decorators
-# https://docs.crewai.com/concepts/crews#example-crew-class-with-decorators
+from tools.custom_tool import CSVFileCreatorTool
 
 load_dotenv()
 MODEL = os.getenv('MODEL')
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-if not MODEL:
-    raise ValueError("MODEL environment variable not set. Please check your .env file.")
-if not OPENAI_API_KEY:
-    raise ValueError("OPENAI_API_KEY environment variable not set. Please check your .env file.")
+csv_tool = CSVFileCreatorTool()
 
 @CrewBase
 class BusinessChatbot:
     """BusinessChatbot crew"""
     agents: List[BaseAgent]
     tasks: List[Task]
-    
+
     # If you would like to add tools to your agents, you can learn more about it here:
     # https://docs.crewai.com/concepts/agents#agent-tools
 
     agents_config="config/agents.yaml"
+    tasks_config = "config/tasks.yaml"  # IMPORTANT: Ajout manquant
+
+
+
     @agent
     def b2b_specialist(self) -> Agent:
         return Agent(
+
             config=self.agents_config['b2b_specialist'],
             llm= MODEL,
             allow_delegation=False,
@@ -42,9 +41,20 @@ class BusinessChatbot:
             allow_delegation=False,
             verbose=True
         )
-    # To learn more about structured task outputs,
-    # task dependencies, and task callbacks, check out the documentation:
-    # https://docs.crewai.com/concepts/tasks#overview-of-a-task
+
+    @agent
+    def business_expert(self) -> Agent:
+            return Agent(
+                config=self.agents_config['business_expert'],
+                llm=MODEL,
+                allow_delegation=False,
+                memory=True,
+                verbose=True,
+                respect_context_window=False,
+                max_iter=3,
+                tools=[csv_tool]
+            )
+
 
     @task
     def b2b_retreiving(self) -> Task:
@@ -57,6 +67,20 @@ class BusinessChatbot:
         return Task(
             config=self.tasks_config['b2c_retreiving'], # type: ignore[index]
 
+        )
+
+    @task
+    def direct_consultation_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['direct_consultation'],
+            agent=self.business_expert()
+        )
+
+    @task
+    def data_analysis_synthesis_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['data_analysis_synthesis'],
+            agent=self.business_expert()
         )
 
     @crew
@@ -80,4 +104,21 @@ class BusinessChatbot:
             verbose=True,
             output_json=True
         )
+
+    @crew
+    def expert_crew(self) -> Crew:
+        """Creates a B2B focused crew"""
+        return Crew(
+            agents=[self.business_expert],
+            tasks=[self.direct_consultation_task],
+            process=Process.sequential,
+            verbose=True,
+            output_json=True
+        )
+
+
+
+
+
+
 

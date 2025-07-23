@@ -218,30 +218,28 @@ def train():
     try:
         BusinessChatbot().crew().train(n_iterations=int(sys.argv[1]), filename=sys.argv[2], inputs=inputs)
 
+
     except Exception as e:
-        raise Exception(f"An error occurred while training the crew: {e}")
+        print(f"\nUne erreur critique est survenue pendant l'exécution du crew : {e}")
+
 
 def replay():
     """
-    Replay the crew execution from a specific task.
+    Relance l'exécution d'un crew à partir d'une tâche spécifique (pour le débogage).
     """
-    try:
-        BusinessChatbot().crew().replay(task_id=sys.argv[1])
+    if len(sys.argv) < 2:
+        print("Usage: python main.py replay <task_id>")
+        return
 
+    task_id = sys.argv[1]
+    print(f"=== Tentative de Replay pour la tâche : {task_id} ===")
+
+    try:
+        BusinessChatbot().crew().replay(task_id=task_id)
     except Exception as e:
-        raise Exception(f"An error occurred while replaying the crew: {e}")
+        print(f"Erreur lors du replay : {e}")
 
-def test():
-    """
-    Test the crew execution and returns the results.
-    """
-    inputs = {
-        "topic": "AI LLMs",
-        "current_year": str(datetime.now().year)
-    }
-    
-    try:
-        BusinessChatbot().crew().test(n_iterations=int(sys.argv[1]), eval_llm=sys.argv[2], inputs=inputs)
+
 
     except Exception as e:
         raise Exception(f"An error occurred while testing the crew: {e}")
@@ -249,3 +247,4 @@ def test():
 
 if __name__ == '__main__':
     app.run(debug=True, port=3002)
+

@@ -1,0 +1,6 @@
+placeId,name,mainCategory,city,state,countryCode,rating,priceRange,isSpendingOnAds,website,phone,canClaim
+b2b001,Tech Solutions Inc,Tech,San Francisco,CA,US,4.5,expensive,true,https://techsolutions.com,+14155551234,true
+b2b002,Green Farms Ltd,Agriculture,Wellington,,NZ,4.0,moderate,false,https://greenfarms.nz,+6441234567,false
+b2b003,Hotel Paradiso,Hotel,Paris,,FR,4.8,expensive,true,https://hotelparadiso.fr,+33123456789,true
+b2b004,QuickFix Auto Repair,Automotive,Toronto,ON,CA,3.9,inexpensive,false,http://quickfixauto.ca,+14165557890,true
+b2b005,Digital Marketing Co,Marketing,London,,GB,4.2,moderate,true,https://dmarketing.co.uk,+442071234567,false
