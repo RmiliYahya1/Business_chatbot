@@ -1,13 +1,13 @@
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
-from crewai_tools import SerperDevTool, WebsiteSearchTool
 from typing import List
 import os
 from dotenv import load_dotenv
+from tools.custom_tool import CSVFileCreatorTool
 
 load_dotenv()
 MODEL = os.getenv('MODEL')
-
+csv_tool = CSVFileCreatorTool()
 
 @CrewBase
 class BusinessChatbot():
@@ -15,8 +15,6 @@ class BusinessChatbot():
     agents_config = "config/agents.yaml"
     tasks_config = "config/tasks.yaml"  # IMPORTANT: Ajout manquant
 
-    search_tool = SerperDevTool()
-    website_search = WebsiteSearchTool()
 
     @agent
     def business_expert(self) -> Agent:
@@ -28,7 +26,7 @@ class BusinessChatbot():
             verbose=True,
             respect_context_window=False,
             max_iter=3,
-            tools=[self.search_tool, self.website_search]
+            tools=[csv_tool]
         )
 
     @task

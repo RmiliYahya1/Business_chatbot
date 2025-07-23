@@ -1,13 +1,6 @@
-ID_Lead,Nom_Entreprise,Secteur_Activité,Pays,Produit_Intéressé,Taille_Contrat_USD,Étape_Vente,Source_Lead,Date_Création
-LEAD001,Innovatech SARL,Technologie,France,CRM Pro,50000,Qualification,Webinar,2025-07-01
-LEAD002,Global Logistics,Transport,Allemagne,Analytics Suite,120000,Proposal,Referral,2025-07-02
-LEAD003,SantéPlus Cliniques,Santé,Espagne,Cloud Storage,25000,Prospect,Website,2025-07-02
-LEAD004,BuildIt Constructions,Construction,France,CRM Pro,45000,Negotiation,Cold Call,2025-07-03
-LEAD005,Financia Banque,Finance,Italie,Analytics Suite,250000,Closed Won,Referral,2025-07-05
-LEAD006,AutoMotion GmbH,Industrie,Allemagne,ERP Master,350000,Proposal,Website,2025-07-06
-LEAD007,La Plume Média,Médias,France,Cloud Storage,15000,Closed Lost,Webinar,2025-07-08
-LEAD008,AgriCorp,Agriculture,Espagne,CRM Pro,65000,Qualification,Website,2025-07-10
-LEAD009,Tech Services UK,Technologie,Royaume-Uni,Analytics Suite,95000,Negotiation,Referral,2025-07-11
-LEAD010,MedicaPharma,Santé,Allemagne,ERP Master,450000,Prospect,Cold Call,2025-07-12
-LEAD011,EuroRetail,Distribution,France,CRM Pro,75000,Proposal,Website,2025-07-15
-LEAD012,Finance Consult,Finance,Royaume-Uni,Analytics Suite,180000,Qualification,Webinar,2025-07-16
+placeId,name,mainCategory,city,state,countryCode,rating,priceRange,isSpendingOnAds,website,phone,canClaim
+b2b001,Tech Solutions Inc,Tech,San Francisco,CA,US,4.5,expensive,true,https://techsolutions.com,+14155551234,true
+b2b002,Green Farms Ltd,Agriculture,Wellington,,NZ,4.0,moderate,false,https://greenfarms.nz,+6441234567,false
+b2b003,Hotel Paradiso,Hotel,Paris,,FR,4.8,expensive,true,https://hotelparadiso.fr,+33123456789,true
+b2b004,QuickFix Auto Repair,Automotive,Toronto,ON,CA,3.9,inexpensive,false,http://quickfixauto.ca,+14165557890,true
+b2b005,Digital Marketing Co,Marketing,London,,GB,4.2,moderate,true,https://dmarketing.co.uk,+442071234567,false
