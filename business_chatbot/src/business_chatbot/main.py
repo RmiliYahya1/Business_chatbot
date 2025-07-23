@@ -6,7 +6,7 @@ from datetime import datetime
 import pandas as pd
 import json
 from business_chatbot.src.business_chatbot.crew import BusinessChatbot
-from flask import Flask, jsonify, request, abort
+from flask import Flask, jsonify, request, abort, Response
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 from  flask_cors import CORS
 # This main file is intended to be a way for you to run your
@@ -26,7 +26,7 @@ headers = {
     "Accept": "*/*"
 }
 
-params = {'page': 0, 'size': 130000, 'sortBy': '_score', 'direction': 'desc'}
+params = {'page': 2, 'size': 50, 'sortBy': '_score', 'direction': 'desc'}
 
 def make_post_request(url, payload, headers, params):
     """Make POST request and handle response"""
@@ -52,33 +52,160 @@ def make_post_request(url, payload, headers, params):
 
 app= Flask(__name__)
 CORS(app)
-CORS(app, resources={r"/api/crew": {"origins": "http://localhost:3000"}})
+CORS(app, resources={r"/api/crew": {"origins": "http://localhost:3002"}})
 @app.route('/api/crew', methods=['POST'])
+
 def run():
     data = request.get_json()
+
     user_input = data.get('input')
     choosed_Agent = data.get('choice')
+    input = {
+        'user_query': user_input,
+    }
     if not user_input or not choosed_Agent:
         return jsonify({'error': 'No input provided'}), 400
+
     try:
-        if choosed_Agent == 1 :
-         result = BusinessChatbot().crew(agents.generate_final_response).kickoff(inputs=user_input)
-         df = pd.DataFrame(result)
-         return df.to_csv(index=False, encoding='utf-8')
-        elif choosed_Agent == 2 :
-         query = BusinessChatbot().crew(agents.b2b_specialist).kickoff(inputs=user_input)
-         result=make_post_request(b2b_api_url, query, headers, params)
-         df = pd.DataFrame(result)
-         return df.to_csv(index=False, encoding='utf-8')
-        else:
-         query = BusinessChatbot().crew(agents.b2c_specialist).kickoff(inputs=user_input)
-         result = make_post_request(b2c_api_url, query, headers, params)
-        return jsonify({
-          'response': result, })
+        if choosed_Agent == 'b2c':
+            query = BusinessChatbot().b2c_crew().kickoff(inputs=input)
+
+            # Handle CrewOutput conversion
+            if hasattr(query, 'raw_output'):
+                query_dict = query.raw_output
+            elif hasattr(query, 'result'):
+                query_dict = query.result
+            else:
+                try:
+                    query_dict = json.loads(str(query))
+                except json.JSONDecodeError:
+                    return jsonify({"error": "Failed to parse CrewAI output"}), 400
+
+            # Make API request and handle response
+            result = make_post_request(b2c_api_url, query_dict, headers, params)
+
+            # Ensure result is a dictionary
+            if isinstance(result, str):
+                try:
+                    result = json.loads(result)
+                except json.JSONDecodeError:
+                    return jsonify({
+                        "error": "Invalid API response format",
+                        "raw_response": result[:200]
+                    }), 400
+
+            desired_fields = [
+                "idS", "userId", "phoneNumber", "firstName", "lastName", "gender",
+                "currentCity", "currentCountry", "hometownCity", "hometownCountry",
+                "relationshipStatus", "workplace", "email", "currentDepartment", "currentRegion"
+            ]
+
+            # Process the data
+            try:
+                records = []
+                if 'results' in result:
+                    records = result['results']
+                elif 'page' in result and 'content' in result['page']:
+                    records = result['page']['content']
+
+                filtered_records = [
+                    {field: record.get(field) for field in desired_fields}
+                    for record in records
+                    if isinstance(record, dict)
+                ]
+
+                if not filtered_records:
+                    return jsonify({"error": "No valid records found after filtering"}), 404
+
+                # Create DataFrame
+                df = pd.DataFrame(filtered_records)
+
+                # Create response with both JSON and CSV
+                '''response = {
+                    "status": "success",
+                    "record_count": len(df),
+                    "sample_data": df.head().to_dict('records'),
+                    "csv_data": df.to_csv(index=False, encoding='utf-8')
+                }'''
+                return Response(
+                df.to_csv(index=False, encoding='utf-8'),
+                    mimetype='text/csv',
+                    headers={'Content-Disposition': 'attachment; filename=data.csv'}
+                )
+
+            except Exception as e:
+                return jsonify({"error": f"Data processing failed: {str(e)}"}), 500
+
+        elif choosed_Agent == 'b2b':
+            query = BusinessChatbot().b2b_crew().kickoff(inputs=input)
+            print(query)
+            # Handle CrewOutput conversion
+            if hasattr(query, 'raw_output'):
+                query_dict = query.raw_output
+            elif hasattr(query, 'result'):
+                query_dict = query.result
+            else:
+                try:
+                    query_dict = json.loads(str(query))
+                except json.JSONDecodeError:
+                    return jsonify({"error": "Failed to parse CrewAI output"}), 400
+
+            # Make API request and handle response
+            result = make_post_request(b2b_api_url, query_dict, headers, params)
+            print(result)
+            # Ensure result is a dictionary
+            if isinstance(result, str):
+                try:
+                    result = json.loads(result)
+                except json.JSONDecodeError:
+                    return jsonify({"error": "Invalid API response format"}), 400
+
+            desired_fields = [
+                "place_id",
+                "city",
+                "coordinates",
+                "detailed_address",
+                "rating"
+            ]
+
+            # Process the data
+            try:
+                records = []
+                if 'results' in result:
+                    records = result['results']
+                elif 'page' in result and 'content' in result['page']:
+                    records = result['page']['content']
+
+                filtered_records = [
+                    {field: record.get(field) for field in desired_fields}
+                    for record in records
+                    if isinstance(record, dict)
+                ]
+
+                if not filtered_records:
+                    return jsonify({"error": "No valid records found after filtering"}), 404
+
+                df = pd.DataFrame(filtered_records)
+
+                '''response = {
+                    "status": "success",
+                    "record_count": len(df),
+                    "sample_data": df.head().to_dict('records'),
+                    "csv_data": df.to_csv(index=False, encoding='utf-8')
+                    "download_link": "/download-csv"
+                }'''
+
+                return Response(
+                    df.to_csv(index=False, encoding='utf-8'),
+                    mimetype='text/csv',
+                    headers={'Content-Disposition': 'attachment; filename=data.csv'}
+                )
+
+            except Exception as e:
+                return jsonify({"error": f"Data processing failed: {str(e)}"}), 500
 
     except Exception as e:
-        raise Exception(f"An error occurred while running the crew: {e}")
-
+        return jsonify({"error": f"An error occurred while running the crew: {str(e)}"}), 500
 
 def train():
     """
@@ -121,4 +248,4 @@ def test():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=3001)
+    app.run(debug=True, port=3002)
