@@ -1,4 +1,0 @@
-{
-    "gender": "female",
-    "currentCity": "Paris"
-}
