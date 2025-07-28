@@ -2,6 +2,8 @@ from crewai import Agent, Crew, Process, Task
 from crewai.agents.agent_builder.base_agent import BaseAgent
 from crewai.project import CrewBase, agent, crew, task
 from typing import List
+from langchain.memory import ConversationBufferMemory
+from langchain.chat_models import ChatOpenAI
 import os
 from dotenv import load_dotenv
 
@@ -18,11 +20,15 @@ class BusinessChatbot:
 #------------------------------------------------------------AGENTS--------------------------------------------------------------------------
     @agent
     def business_expert(self) -> Agent:
+        memory = ConversationBufferMemory(
+            memory_key="chat_history",
+            return_messages=True,
+        )
         return Agent(
             config=self.agents_config['business_expert'],
             llm=MODEL,
             allow_delegation=False,
-            memory=True,
+            memory=memory,
             verbose=True,
             max_iter=1,
         )
@@ -51,7 +57,7 @@ class BusinessChatbot:
     def direct_consultation_task(self) -> Task:
         return Task(
             config=self.tasks_config['direct_consultation'],
-            agent=self.business_expert()
+            agent=self.business_expert(),
         )
 
     @task
@@ -82,39 +88,11 @@ class BusinessChatbot:
         return Crew(
             agents=[self.business_expert()],
             tasks=[self.direct_consultation_task()],
-            process=Process.sequential,
-            verbose=True
+            verbose=True,
+            memory=True
         )
 
-    @crew
-    def b2c_extraction_crew(self) -> Crew:
-        """Crew pour extraction JSON B2C"""
-        return Crew(
-            agents=[self.b2c_specialist()],
-            tasks=[self.b2c_extraction_task()],
-            process=Process.sequential,
-            verbose=True,
-        )
 
-    @crew
-    def b2b_extraction_crew(self) -> Crew:
-        """Crew pour extraction JSON B2B"""
-        return Crew(
-            agents=[self.b2b_specialist()],
-            tasks=[self.b2b_extraction_task()],
-            process=Process.sequential,
-            verbose=True,
-        )
-
-    @crew
-    def analysis_crew(self) -> Crew:
-        """Crew pour analyse finale des données"""
-        return Crew(
-            agents=[self.business_expert()],
-            tasks=[self.data_analysis_synthesis_task()],
-            process=Process.sequential,
-            verbose=True,
-        )
 
 
 

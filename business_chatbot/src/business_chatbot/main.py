@@ -3,101 +3,47 @@ from flask_cors import CORS
 import logging
 from business_chatbot.src.business_chatbot.business_flow import BusinessChatbotFlow as Processor
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+
 
 app = Flask(__name__)
 CORS(app)
-
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 @app.route('/api/crew', methods=['POST'])
-def run():
-    """Point d'entrée principal de l'API"""
+def handle_Requests():
     try:
-        # Validation des données
+    #recuperation de l'objet json fournie par la partie front-end
+    #nous recuperrons un objet json avec deux attribut -- choice, input
         data = request.get_json()
-        if not data:
-            return jsonify({'error': 'Aucune donnée JSON fournie'}), 400
+        logging.info(data)
 
-        user_input = data.get('input')
-        chosen_agent = data.get('choice')
+    #recuperer les valeur des clé de l'objet json et les stocker dans les variables -- user_choice, user_input
+        user_choice = data['choice']
+        user_input = data['input']
+        logging.info(user_choice)
+        logging.info(user_input)
 
-        if not user_input:
-            return jsonify({'error': 'Input utilisateur manquant'}), 400
+    #injecter les valeur recuperé dans un objet json
+        user_info ={'choice': user_choice, 'input': user_input}
 
-        print(f"[MAIN] Requête reçue - Input: '{user_input}', Choice: '{chosen_agent}'")
-
-        # Traitement avec l'approche choisie
         processor = Processor()
+        crews_result = processor.kickoff(inputs=user_info)
+        logging.info(f"Crew result: {crews_result}")
 
-        flow_inputs = {
-            'user_input': user_input,
-            'choice': chosen_agent
-        }
-        print(f"[MAIN] Inputs pour le Flow: {flow_inputs}")
+        if user_choice == 'default':
+            if hasattr(crews_result, 'raw'):
+                response_text = str(crews_result.raw)
+            else:
+                response_text = str(crews_result)
 
-        processor.plot()
-        result = processor.kickoff(inputs=flow_inputs)
-
-
-        print(f"[MAIN] Type du résultat: {type(result)}")
-        print(f"[MAIN] Contenu du résultat: {result}")
-
-        # Vérification que le résultat n'est pas None
-        if result is None:
-            return jsonify({'error': 'Le processeur a retourné None - vérifiez les logs'}), 500
-
-        return _handle_result(result)
+            return jsonify({"response": response_text}), 200
 
     except Exception as e:
-        logger.error(f"[MAIN] Erreur dans /api/crew: {str(e)}")
-        return jsonify({'error': f'Erreur serveur: {str(e)}'}), 500
-
-
-def _handle_result(result) -> Response:
-    """Traite le résultat et retourne la réponse appropriée"""
-
-    # Vérification de sécurité
-    if result is None:
-        return jsonify({'error': 'Résultat vide'}), 500
-
-    # Si result n'est pas un dict, on le convertit
-    if not isinstance(result, dict):
-        return jsonify({
-            'response': str(result),
-            'type': 'raw_output'
-        })
-
-    result_type = result.get('type', 'unknown')
-    print(f"[MAIN] Traitement résultat type: {result_type}")
-
-    if result_type == 'direct_response':
-        return jsonify({
-            'response': result.get('response', 'Pas de réponse'),
-            'type': 'consultation'
-        })
-
-    elif result_type == 'data_analysis':
-        return jsonify({
-            'response': result.get('response', 'Pas de réponse'),
-            'type': 'analysis',
-            'csv_available': True,
-            'csv_data': result.get('csv_data', ''),
-            'record_count': len(result.get('csv_data', '').split('\n')) - 2 if result.get('csv_data') else 0
-        })
-
-    elif result_type == 'error':
-        return jsonify({
-            'error': result.get('error', 'Erreur inconnue'),
-            'type': 'error'
-        }), 500
-
-    else:
-        return jsonify({
-            'response': str(result),
-            'type': 'unknown'
-        })
-
+        logging.error(f"Erreur: {str(e)}")
+        import traceback
+        logging.error(traceback.format_exc())
+        return jsonify({"response": "Désolé, une erreur s'est produite."}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=3002)
