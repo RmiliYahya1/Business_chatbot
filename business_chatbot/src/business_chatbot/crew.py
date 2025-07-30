@@ -1,14 +1,27 @@
-from crewai import Agent, Crew, Process, Task
+from crewai import Agent, Crew, Process, Task, LLM
 from crewai.agents.agent_builder.base_agent import BaseAgent
 from crewai.project import CrewBase, agent, crew, task
-from typing import List
-from langchain.memory import ConversationBufferMemory
 from langchain.chat_models import ChatOpenAI
-import os
+import os, threading, queue
+from crewai.utilities.events import LLMStreamChunkEvent, crewai_event_bus
+from crewai.utilities.events.base_event_listener import BaseEventListener
 from dotenv import load_dotenv
 
 load_dotenv()
 MODEL = os.getenv('MODEL')
+token_queue = queue.Queue()
+
+class StreamListener(BaseEventListener):
+    def setup_listeners(self, crewai_event_bus):
+        @crewai_event_bus.on(LLMStreamChunkEvent)
+        def on_llm_stream_chunk(source, event):
+            token_queue.put(event.chunk)
+
+stream_listener = StreamListener()
+my_llm = LLM(
+    model=MODEL,
+    stream=True
+)
 
 @CrewBase
 class BusinessChatbot:
@@ -17,18 +30,14 @@ class BusinessChatbot:
     agents_config="config/agents.yaml"
     tasks_config = "config/tasks.yaml"
 
+
 #------------------------------------------------------------AGENTS--------------------------------------------------------------------------
     @agent
     def business_expert(self) -> Agent:
-        memory = ConversationBufferMemory(
-            memory_key="chat_history",
-            return_messages=True,
-        )
         return Agent(
             config=self.agents_config['business_expert'],
-            llm=MODEL,
+            llm=my_llm,
             allow_delegation=False,
-            memory=memory,
             verbose=True,
             max_iter=1,
         )
@@ -37,7 +46,7 @@ class BusinessChatbot:
     def b2b_specialist(self) -> Agent:
         return Agent(
             config=self.agents_config['b2b_specialist'],
-            llm=MODEL,
+            llm=my_llm,
             allow_delegation=False,
             verbose=True
         )
@@ -46,7 +55,7 @@ class BusinessChatbot:
     def b2c_specialist(self) -> Agent:
         return Agent(
             config=self.agents_config['b2c_specialist'],
-            llm=MODEL,
+            llm=my_llm,
             allow_delegation=False,
             verbose=True
         )
@@ -89,7 +98,6 @@ class BusinessChatbot:
             agents=[self.business_expert()],
             tasks=[self.direct_consultation_task()],
             verbose=True,
-            memory=True
         )
 
 

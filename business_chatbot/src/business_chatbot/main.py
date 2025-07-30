@@ -1,7 +1,10 @@
 from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
 import logging
+import threading
+import queue
 from business_chatbot.src.business_chatbot.business_flow import BusinessChatbotFlow as Processor
+from business_chatbot.src.business_chatbot.crew import token_queue
 
 
 
@@ -44,6 +47,29 @@ def handle_Requests():
         import traceback
         logging.error(traceback.format_exc())
         return jsonify({"response": "Désolé, une erreur s'est produite."}), 500
+
+@app.route('/api/crew/stream', methods=['POST'])
+def stream_crew():
+    data = request.get_json()
+    logger.info(f"API stream request: {data}")
+    processor = Processor()
+
+    # Lancement dans un thread séparé
+    thread = threading.Thread(target=lambda: processor.kickoff(inputs={'choice': data.get('choice'), 'input': data.get('input')}), daemon=True)
+    thread.start()
+
+    def event_generator():
+        while thread.is_alive() or not token_queue.empty():
+            try:
+                token = token_queue.get(timeout=0.5)
+                yield f"data: {token}\n\n"
+                token_queue.task_done()
+            except queue.Empty:
+                continue
+        yield "data: [END]\n\n"
+
+    return Response(event_generator(), mimetype='text/event-stream')
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=3002)
