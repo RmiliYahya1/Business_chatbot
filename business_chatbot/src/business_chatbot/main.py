@@ -2,11 +2,15 @@
 import sys
 import warnings
 import requests
+import tempfile
 from datetime import datetime
 import pandas as pd
 import json
+from crewai_tools import CSVSearchTool
 from business_chatbot.src.business_chatbot.crew import BusinessChatbot
-from flask import Flask, jsonify, request, abort, Response
+from flask import Flask, jsonify, request, abort, Response, stream_with_context
+
+Rag=CSVSearchTool()
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 from  flask_cors import CORS
 # This main file is intended to be a way for you to run your
@@ -26,7 +30,7 @@ headers = {
     "Accept": "*/*"
 }
 
-params = {'page': 2, 'size': 50, 'sortBy': '_score', 'direction': 'desc'}
+params = {'page': 10, 'size': 10, 'sortBy': '_score', 'direction': 'desc'}
 
 def make_post_request(url, payload, headers, params):
     """Make POST request and handle response"""
@@ -54,7 +58,6 @@ app= Flask(__name__)
 CORS(app)
 CORS(app, resources={r"/api/crew": {"origins": "http://localhost:3002"}})
 @app.route('/api/crew', methods=['POST'])
-
 def run():
     data = request.get_json()
 
@@ -68,6 +71,7 @@ def run():
 
     try:
         if choosed_Agent == 'b2c':
+            
             query = BusinessChatbot().b2c_crew().kickoff(inputs=input)
 
             # Handle CrewOutput conversion
@@ -118,7 +122,7 @@ def run():
                     return jsonify({"error": "No valid records found after filtering"}), 404
 
                 # Create DataFrame
-                df = pd.DataFrame(filtered_records)
+                df = pd.DataFrame(records)
 
                 # Create response with both JSON and CSV
                 '''response = {
@@ -127,12 +131,32 @@ def run():
                     "sample_data": df.head().to_dict('records'),
                     "csv_data": df.to_csv(index=False, encoding='utf-8')
                 }'''
-                return Response(
+                '''return Response(
                 df.to_csv(index=False, encoding='utf-8'),
                     mimetype='text/csv',
                     headers={'Content-Disposition': 'attachment; filename=data.csv'}
+                )'''
+                csv_data = df.to_csv(index=False, encoding='utf-8')
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as tmp:
+                    tmp.write(csv_data)
+                    csv_path = tmp.name
+
+                rag = CSVSearchTool(
+                    file_path=csv_path,
+                    description="Tool to search through the provided business data"
                 )
 
+
+                BusinessChatbot().set_rag_tool(rag)  # Set the RAG tool
+                input.update({'dataset_info': f"Dataset loaded with {len(df)} B2C records. Use the search tool to analyze the data."})
+
+                # Now call expert_crew2 without parameters
+                response = BusinessChatbot().expert_crew2().kickoff(inputs=input)
+
+                return jsonify({
+                    "response": str(response),
+                    "csv": csv_data
+                }), 200
             except Exception as e:
                 return jsonify({"error": f"Data processing failed: {str(e)}"}), 500
 
@@ -185,7 +209,7 @@ def run():
                 if not filtered_records:
                     return jsonify({"error": "No valid records found after filtering"}), 404
 
-                df = pd.DataFrame(filtered_records)
+                df = pd.DataFrame(records)
 
                 '''response = {
                     "status": "success",
@@ -194,18 +218,47 @@ def run():
                     "csv_data": df.to_csv(index=False, encoding='utf-8')
                     "download_link": "/download-csv"
                 }'''
-
+                '''
                 return Response(
                     df.to_csv(index=False, encoding='utf-8'),
                     mimetype='text/csv',
                     headers={'Content-Disposition': 'attachment; filename=data.csv'}
+                )'''
+                csv_data = df.to_csv(index=False, encoding='utf-8')
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as tmp:
+                    tmp.write(csv_data)
+                    csv_path = tmp.name
+
+                rag = CSVSearchTool(
+                    file_path=csv_path,
+                    description="Tool to search through the provided business data"
                 )
+
+                BusinessChatbot().set_rag_tool(rag)
+                input.update({'dataset_info': f"Dataset loaded with {len(df)} B2B records. Use the search tool to analyze the data."})
+
+                # Now call expert_crew2 without parameters
+                response = BusinessChatbot().expert_crew2().kickoff(inputs=input)
+                return jsonify({"response": str(response)
+                                   , "csv": csv_data}), 200
 
             except Exception as e:
                 return jsonify({"error": f"Data processing failed: {str(e)}"}), 500
+        else:
+            try:
+                result = BusinessChatbot().expert_crew1(None).kickoff(inputs=input)
+                return jsonify({"response": str(result)})
+
+            except Exception as e:
+                 return jsonify({"error": f"Data processing failed: {str(e)}"}), 500
 
     except Exception as e:
         return jsonify({"error": f"An error occurred while running the crew: {str(e)}"}), 500
+
+
+    except Exception as e:
+          # Return regular JSON response for initialization errors
+          return jsonify({"error": f"Initialization failed: {str(e)}"}), 500
 
 def train():
     """
