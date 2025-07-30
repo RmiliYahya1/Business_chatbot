@@ -5,6 +5,8 @@ import os, queue
 from crewai.utilities.events import LLMStreamChunkEvent, crewai_event_bus,CrewKickoffCompletedEvent
 from crewai.utilities.events.base_event_listener import BaseEventListener
 from dotenv import load_dotenv
+from typing import List, Optional
+from crewai_tools import CSVSearchTool
 
 load_dotenv()
 MODEL = os.getenv('MODEL')
@@ -25,27 +27,45 @@ my_llm = LLM(
 @CrewBase
 class BusinessChatbot:
     """BusinessChatbot crews"""
+    def __init__(self):
+        super().__init__()
+        self._rag_tool = None  # Store the RAG tool as an instance variable
+
 
     agents_config="config/agents.yaml"
     tasks_config = "config/tasks.yaml"
-
+    os.environ["CREWAI_STORAGE_DIR"] = "./my_project_storage"
 
 #------------------------------------------------------------AGENTS--------------------------------------------------------------------------
+
+    def set_rag_tool(self, rag_tool):
+        """Set the RAG tool to be used by the business expert"""
+        self._rag_tool = rag_tool
+
     @agent
     def business_expert(self) -> Agent:
+        """Business expert agent with optional RAG tool"""
+        tools = []
+        if self._rag_tool is not None:
+            tools = [self._rag_tool]
+
         return Agent(
             config=self.agents_config['business_expert'],
             llm=my_llm,
             allow_delegation=False,
+            memory=True,
             verbose=True,
+            tools=tools,
+            respect_context_window=False,
             max_iter=1,
         )
+
 
     @agent
     def b2b_specialist(self) -> Agent:
         return Agent(
             config=self.agents_config['b2b_specialist'],
-            llm=my_llm,
+            llm=MODEL,
             allow_delegation=False,
             verbose=True
         )
@@ -54,12 +74,29 @@ class BusinessChatbot:
     def b2c_specialist(self) -> Agent:
         return Agent(
             config=self.agents_config['b2c_specialist'],
-            llm=my_llm,
+            llm=MODEL,
             allow_delegation=False,
             verbose=True
         )
 
+
 # ------------------------------------------------------------TASKS--------------------------------------------------------------------------
+
+
+    @task
+    def b2b_retreiving(self) -> Task:
+        return Task(
+            config=self.tasks_config['b2b_retreiving'],
+            agent=self.b2b_specialist()
+        )
+
+    @task
+    def b2c_retreiving(self) -> Task:
+        return Task(
+            config=self.tasks_config['b2c_retreiving'],
+            agent=self.b2c_specialist()
+        )
+
 
     @task
     def direct_consultation_task(self) -> Task:
@@ -75,19 +112,6 @@ class BusinessChatbot:
             agent=self.business_expert()
         )
 
-    @task
-    def b2b_extraction_task(self) -> Task:
-        return Task(
-            config=self.tasks_config['b2b_retreiving'],
-            agent=self.b2b_specialist()
-        )
-
-    @task
-    def b2c_extraction_task(self) -> Task:
-        return Task(
-            config=self.tasks_config['b2c_retreiving'],
-            agent=self.b2c_specialist()
-        )
 # ------------------------------------------------------------CREWS--------------------------------------------------------------------------
 
     @crew
@@ -99,6 +123,50 @@ class BusinessChatbot:
             verbose=True,
         )
 
+
+    @crew
+    def expert_crew2_with_rag(self, rag_tool) -> Crew:
+        """Creates an expert crew for data analysis with specific RAG tool"""
+        # Temporarily set the RAG tool
+        old_rag = self._rag_tool
+        self._rag_tool = rag_tool
+
+        crew = Crew(
+            agents=[self.business_expert()],
+            tasks=[self.data_analysis_synthesis_task()],
+            process=Process.sequential,
+            verbose=True,
+            output_json=True
+        )
+
+        # Restore the old RAG tool
+        self._rag_tool = old_rag
+        return crew
+
+    def crew(self):
+        pass
+
+    @crew
+    def b2c_crew(self) -> Crew:
+        """Creates a B2C focused crew"""
+        return Crew(
+            agents=[self.b2c_specialist()],
+            tasks=[self.b2c_retreiving()],
+            process=Process.sequential,
+            verbose=True,
+            output_json=True
+        )
+
+    @crew
+    def b2b_crew(self) -> Crew:
+        """Creates a B2B focused crew"""
+        return Crew(
+            agents=[self.b2b_specialist()],
+            tasks=[self.b2b_retreiving()],
+            process=Process.sequential,
+            verbose=True,
+            output_json=True
+        )
 
 
 
