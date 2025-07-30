@@ -1,9 +1,8 @@
 from crewai import Agent, Crew, Process, Task, LLM
 from crewai.agents.agent_builder.base_agent import BaseAgent
 from crewai.project import CrewBase, agent, crew, task
-from langchain.chat_models import ChatOpenAI
-import os, threading, queue
-from crewai.utilities.events import LLMStreamChunkEvent, crewai_event_bus
+import os, queue
+from crewai.utilities.events import LLMStreamChunkEvent, crewai_event_bus,CrewKickoffCompletedEvent
 from crewai.utilities.events.base_event_listener import BaseEventListener
 from dotenv import load_dotenv
 
@@ -13,11 +12,11 @@ token_queue = queue.Queue()
 
 class StreamListener(BaseEventListener):
     def setup_listeners(self, crewai_event_bus):
-        @crewai_event_bus.on(LLMStreamChunkEvent)
-        def on_llm_stream_chunk(source, event):
+        @crewai_event_bus.on(CrewKickoffCompletedEvent)
+        def on_llm_chunk(source, event):
             token_queue.put(event.chunk)
-
 stream_listener = StreamListener()
+
 my_llm = LLM(
     model=MODEL,
     stream=True
