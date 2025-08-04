@@ -20,7 +20,7 @@ headers = {
     "Content-Type": "application/json",
     "Accept": "*/*"
 }
-params = {'page': 10, 'size': 10, 'sortBy': '_score', 'direction': 'desc'}
+params = {'sortBy': '_score', 'direction': 'desc'}
 
 
 def make_post_request(url, payload, headers, params):
@@ -135,18 +135,17 @@ class BusinessChatbotFlow(Flow[UserChoice]):
             if not records:
                 return jsonify({"error": "No records found"}), 404
 
-            filtered_records = [
-                {field: record.get(field) for field in desired_fields}
-                for record in records if isinstance(record, dict)
+            records = [
+                record for record in records if isinstance(record, dict)
             ]
 
-            if not filtered_records:
+            if not records:
                 return jsonify({"error": "No valid records after filtering"}), 404
 
-            logger.info(f"Processed {len(filtered_records)} B2B records")
+            logger.info(f"Processed {len(records)} B2B records")
 
             # 5. Create CSV for download
-            df = pd.DataFrame(filtered_records)
+            df = pd.DataFrame(records)
             csv_data = df.to_csv(index=False, encoding='utf-8')
 
             # 6. Create temporary file for RAG analysis
@@ -164,7 +163,7 @@ class BusinessChatbotFlow(Flow[UserChoice]):
 
             # 8. ✅ SOLUTION CORRIGÉE : Utiliser expert_crew2 correctement
             BusinessChatbot().set_rag_tool(rag)  # Set the RAG tool
-            inputs_dict.update({'dataset_info': f"Dataset loaded with {len(df)} B2C records. Use the search tool to analyze the data."})
+            inputs_dict.update({'dataset_info': f"Dataset loaded with {len(df)} B2C records. Use the search tool to analyze a random sample of  data."})
 
             logger.info("Calling expert_crew2 for analysis...")
             # ✅ Appel correct de expert_crew2 (paramètre positionnel)
@@ -230,16 +229,15 @@ class BusinessChatbotFlow(Flow[UserChoice]):
             if not records:
                 return jsonify({"error": "No records found"}), 404
 
-            filtered_records = [
-                {field: record.get(field) for field in desired_fields}
-                for record in records if isinstance(record, dict)
+            records = [
+                record for record in records if isinstance(record, dict)
             ]
 
-            if not filtered_records:
+            if not records:
                 return jsonify({"error": "No valid records after filtering"}), 404
 
             # 5. Create CSV
-            df = pd.DataFrame(filtered_records)
+            df = pd.DataFrame(records)
             csv_data = df.to_csv(index=False, encoding='utf-8')
 
             # 6. Create RAG analysis
@@ -253,8 +251,7 @@ class BusinessChatbotFlow(Flow[UserChoice]):
             )
 
             BusinessChatbot().set_rag_tool(rag)  # Set the RAG tool
-            inputs_dict.update({
-                                   'dataset_info': f"Dataset loaded with {len(df)} B2C records. Use the search tool to analyze the data."})
+            inputs_dict.update({'dataset_info': f"Dataset loaded with {len(df)} B2C records. Use the search tool to analyze a random sample of data."})
 
             logger.info("Calling expert_crew2 for analysis...")
             # ✅ Appel correct de expert_crew2 (paramètre positionnel)

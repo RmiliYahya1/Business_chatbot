@@ -335,16 +335,16 @@ direct_consultation:
 
 data_analysis_synthesis:
   description: >
-    Interpréter et synthétiser des données CSV B2B ou B2C générées par les agents spécialisés,
+    Interpréter et synthétiser un échantillon de données CSV B2B ou B2C générées par les agents spécialisés,
     puis créer une réponse enrichie pour l'utilisateur final.
-    Les données brutes sont fournies dans le contexte : {dataset_info}.
+    Les données ou vous allez prendre un échantillon sont fournies dans le contexte : {dataset_info}.
     
     Cette tâche est activée quand un bouton (B2B ou B2C) est sélectionné et que des données
     structurées sont disponibles via le contexte de la tâche.
     
     Processus à suivre :
     1. Analyser l'input utilisateur original pour comprendre son besoin  : {user_query}
-    2. Examiner les données CSV fournies : {dataset_info}
+    2. Examiner un échantillon de données aléatoirement CSV fournies : {dataset_info}
     3. Extraire les insights clés et tendances significatives
     5. Corréler les données avec la demande utilisateur initiale
     6. Synthétiser les findings en recommandations business
