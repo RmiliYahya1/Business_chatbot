@@ -163,28 +163,12 @@ class BusinessChatbotFlow(Flow[UserChoice]):
             )
 
             # 8. ✅ SOLUTION CORRIGÉE : Utiliser expert_crew2 correctement
-            business_chatbot_with_rag = BusinessChatbot()
-
-            # Préparer les inputs pour l'analyse
-            analysis_inputs = {
-                'user_query': user_query,
-                'dataset_info': f"""
-    Dataset B2B chargé avec succès !
-
-    **Informations sur les données :**
-    - Nombre d'entreprises : {len(filtered_records)}
-    - Champs disponibles : {', '.join(desired_fields)}
-    - Requête utilisateur : "{user_query}"
-
-    **Instructions :**
-    Utilisez l'outil de recherche CSV pour analyser les données et fournir des insights pertinents.
-    Créez une réponse structurée avec des sections markdown appropriées.
-                    """.strip()
-            }
+            BusinessChatbot().set_rag_tool(rag)  # Set the RAG tool
+            inputs_dict.update({'dataset_info': f"Dataset loaded with {len(df)} B2C records. Use the search tool to analyze the data."})
 
             logger.info("Calling expert_crew2 for analysis...")
             # ✅ Appel correct de expert_crew2 (paramètre positionnel)
-            response = business_chatbot_with_rag.expert_crew2(rag).kickoff(inputs=analysis_inputs)
+            response = BusinessChatbot().expert_crew2().kickoff(inputs=inputs_dict)
 
             logger.info("Analysis completed successfully")
 
@@ -268,28 +252,13 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                 description="Tool to search through the provided B2C consumer data"
             )
 
-            # 7. ✅ SOLUTION CORRIGÉE : Même approche pour B2C
-            business_chatbot_with_rag = BusinessChatbot()
+            BusinessChatbot().set_rag_tool(rag)  # Set the RAG tool
+            inputs_dict.update({
+                                   'dataset_info': f"Dataset loaded with {len(df)} B2C records. Use the search tool to analyze the data."})
 
-            analysis_inputs = {
-                'user_query': user_query,
-                'dataset_info': f"""
-    Dataset B2C chargé avec succès !
-
-    **Informations sur les données :**
-    - Nombre de consommateurs : {len(filtered_records)}
-    - Champs disponibles : {', '.join(desired_fields)}
-    - Requête utilisateur : "{user_query}"
-
-    **Instructions :**
-    Utilisez l'outil de recherche CSV pour analyser les données démographiques et comportementales.
-    Fournissez des insights marketing pertinents avec une structuration markdown claire.
-                    """.strip()
-            }
-
-            # ✅ Appel correct de expert_crew2
-            response = business_chatbot_with_rag.expert_crew2(rag).kickoff(inputs=analysis_inputs)
-
+            logger.info("Calling expert_crew2 for analysis...")
+            # ✅ Appel correct de expert_crew2 (paramètre positionnel)
+            response = BusinessChatbot().expert_crew2().kickoff(inputs=inputs_dict)
             return jsonify({
                 "response": str(response),
                 "csv": csv_data

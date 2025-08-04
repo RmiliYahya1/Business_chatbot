@@ -128,23 +128,15 @@ class BusinessChatbot:
         )
 
     @crew
-    def expert_crew2(self, rag_tool) -> Crew:
-        """Creates an expert crew for data analysis with specific RAG tool"""
-        # Temporarily set the RAG tool
-        old_rag = self._rag_tool
-        self._rag_tool = rag_tool
+    def expert_crew2(self) -> Crew:
 
-        crew = Crew(
+        return Crew(
             agents=[self.business_expert()],
             tasks=[self.data_analysis_synthesis_task()],
             process=Process.sequential,
             verbose=True,
             output_json=True
         )
-
-        # Restore the old RAG tool
-        self._rag_tool = old_rag
-        return crew
 
     @crew
     def b2c_crew(self) -> Crew:
