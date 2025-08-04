@@ -65,6 +65,7 @@ def run():
     choosed_Agent = data.get('choice')
     input = {
         'user_query': user_input,
+        'choice': choosed_Agent,
     }
     if not user_input or not choosed_Agent:
         return jsonify({'error': 'No input provided'}), 400
@@ -124,7 +125,7 @@ def run():
                 # Create DataFrame
                 df = pd.DataFrame(records)
 
-                # Create response with both JSON and CSV
+
                 '''response = {
                     "status": "success",
                     "record_count": len(df),
@@ -150,7 +151,7 @@ def run():
                 BusinessChatbot().set_rag_tool(rag)  # Set the RAG tool
                 input.update({'dataset_info': f"Dataset loaded with {len(df)} B2C records. Use the search tool to analyze the data."})
 
-                # Now call expert_crew2 without parameters
+
                 response = BusinessChatbot().expert_crew2().kickoff(inputs=input)
 
                 return jsonify({
@@ -163,7 +164,7 @@ def run():
         elif choosed_Agent == 'b2b':
             query = BusinessChatbot().b2b_crew().kickoff(inputs=input)
             print(query)
-            # Handle CrewOutput conversion
+
             if hasattr(query, 'raw_output'):
                 query_dict = query.raw_output
             elif hasattr(query, 'result'):
@@ -174,7 +175,7 @@ def run():
                 except json.JSONDecodeError:
                     return jsonify({"error": "Failed to parse CrewAI output"}), 400
 
-            # Make API request and handle response
+
             result = make_post_request(b2b_api_url, query_dict, headers, params)
             print(result)
             # Ensure result is a dictionary
@@ -237,7 +238,7 @@ def run():
                 BusinessChatbot().set_rag_tool(rag)
                 input.update({'dataset_info': f"Dataset loaded with {len(df)} B2B records. Use the search tool to analyze the data."})
 
-                # Now call expert_crew2 without parameters
+
                 response = BusinessChatbot().expert_crew2().kickoff(inputs=input)
                 return jsonify({"response": str(response)
                                    , "csv": csv_data}), 200
@@ -246,7 +247,7 @@ def run():
                 return jsonify({"error": f"Data processing failed: {str(e)}"}), 500
         else:
             try:
-                result = BusinessChatbot().expert_crew1(None).kickoff(inputs=input)
+                result = BusinessChatbot().expert_crew1().kickoff(inputs=input)
                 return jsonify({"response": str(result)})
 
             except Exception as e:
@@ -257,7 +258,7 @@ def run():
 
 
     except Exception as e:
-          # Return regular JSON response for initialization errors
+
           return jsonify({"error": f"Initialization failed: {str(e)}"}), 500
 
 def train():

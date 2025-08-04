@@ -327,28 +327,10 @@ direct_consultation:
     Analyser la demande textuelle de l'utilisateur et fournir une réponse experte immédiate
     en tant qu'analyste senior en marketing data et intelligence commerciale.
 
-    Cette tâche est activée quand AUCUN bouton (B2B/B2C) n'est sélectionné.
-    L'utilisateur pose une question générale nécessitant des conseils stratégiques immédiats.
 
-    Processus à suivre :
-    1. Analyser l'intention et le contexte de la demande utilisateur
-    2. Identifier le domaine d'expertise requis (marketing, BI, comportement d'achat)
-    3. Générer une réponse  directe basée sur ton expertise
-    4. Adapter le ton et le niveau technique à l'audience identifiée
-
-    La réponse doit être autonome, sans référence à des données externes ou fichiers.
-    Focus sur les conseils pratiques et actionnables.
   expected_output: >
-    Une réponse consultative complète en format markdown avec des titres pertinents choisis par l'agent.
-    Structure recommandée (titres à adapter selon le contexte) :
-    - Une section de synthèse/compréhension de la demande
-    - Une section d'analyse experte du contexte business  
-    - Une section de recommandations stratégiques concrètes
-    - Une section d'actions prioritaires si applicable
-    L'agent doit choisir des titres de sections (## Titre) qui correspondent naturellement 
-    au sujet traité et au contexte business identifié.
+    Une réponse consultative complète et liée au questions précédentes
   agent: business_expert
-  guardrail: Vérifier que la réponse ne mentionne aucun fichier CSV ou données externes.
   output_file: "direct_response.md"
 
 data_analysis_synthesis:

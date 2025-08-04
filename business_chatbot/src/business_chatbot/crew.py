@@ -1,5 +1,8 @@
 from crewai import Agent, Crew, Process, Task
 from crewai.agents.agent_builder.base_agent import BaseAgent
+from crewai.memory import LongTermMemory, ShortTermMemory
+from uuid import uuid4
+from crewai.memory.storage.ltm_sqlite_storage import LTMSQLiteStorage
 from crewai.project import CrewBase, agent, crew, task
 from typing import List, Optional
 import os
@@ -11,7 +14,6 @@ load_dotenv()
 MODEL = os.getenv('MODEL')
 csv_tool = CSVFileCreatorTool()
 os.environ["CREWAI_STORAGE_DIR"] = "./my_project_storage"
-
 
 @CrewBase
 class BusinessChatbot:
@@ -25,6 +27,7 @@ class BusinessChatbot:
     def __init__(self):
         super().__init__()
         self._rag_tool = None  # Store the RAG tool as an instance variable
+
 
     def set_rag_tool(self, rag_tool):
         """Set the RAG tool to be used by the business expert"""
@@ -59,11 +62,11 @@ class BusinessChatbot:
             config=self.agents_config['business_expert'],
             llm=MODEL,
             allow_delegation=False,
-            memory=True,
             verbose=True,
             tools=tools,
             respect_context_window=False,
             max_iter=1,
+            memory=True
         )
 
     @task
@@ -136,6 +139,12 @@ class BusinessChatbot:
             process=Process.sequential,
             verbose=True,
             memory=True,
+            long_term_memory=LongTermMemory(
+                storage=LTMSQLiteStorage(
+                    db_path=f"./my_project_storage"
+                )
+            ),
+            short_term_memory=ShortTermMemory(),
             output_json=True,
         )
 
