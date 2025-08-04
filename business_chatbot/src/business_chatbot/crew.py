@@ -2,53 +2,49 @@ from crewai import Agent, Crew, Process, Task, LLM
 from crewai.agents.agent_builder.base_agent import BaseAgent
 from crewai.project import CrewBase, agent, crew, task
 import os, queue
-from crewai.utilities.events import LLMStreamChunkEvent, crewai_event_bus,CrewKickoffCompletedEvent
-from crewai.utilities.events.base_event_listener import BaseEventListener
 from dotenv import load_dotenv
-from typing import List, Optional
-from crewai_tools import CSVSearchTool
+from crewai.memory import LongTermMemory, ShortTermMemory
+from uuid import uuid4
+from crewai.memory.storage.ltm_sqlite_storage import LTMSQLiteStorage
+from business_chatbot.src.business_chatbot.tools.custom_tool import CSVFileCreatorTool
 
 load_dotenv()
 MODEL = os.getenv('MODEL')
 token_queue = queue.Queue()
+csv_tool = CSVFileCreatorTool()
 
-class StreamListener(BaseEventListener):
-    def setup_listeners(self, crewai_event_bus):
-        @crewai_event_bus.on(CrewKickoffCompletedEvent)
-        def on_llm_chunk(source, event):
-            token_queue.put(event.chunk)
-stream_listener = StreamListener()
 
 my_llm = LLM(
-    model=MODEL,
-    stream=True
+    model=f"openai/{MODEL}",
+    api_key=os.getenv("OPENAI_API_KEY"),
+    stream=True,
+    temperature=0.7,
 )
 
 @CrewBase
 class BusinessChatbot:
     """BusinessChatbot crews"""
-    def __init__(self):
-        super().__init__()
-        self._rag_tool = None  # Store the RAG tool as an instance variable
-
 
     agents_config="config/agents.yaml"
     tasks_config = "config/tasks.yaml"
     os.environ["CREWAI_STORAGE_DIR"] = "./my_project_storage"
 
-#------------------------------------------------------------AGENTS--------------------------------------------------------------------------
+    def __init__(self):
+        super().__init__()
+        self._rag_tool = None  # Store the RAG tool as an instance variable
+
 
     def set_rag_tool(self, rag_tool):
         """Set the RAG tool to be used by the business expert"""
         self._rag_tool = rag_tool
 
+#------------------------------------------------------------AGENTS--------------------------------------------------------------------------
     @agent
     def business_expert(self) -> Agent:
         """Business expert agent with optional RAG tool"""
         tools = []
         if self._rag_tool is not None:
             tools = [self._rag_tool]
-
         return Agent(
             config=self.agents_config['business_expert'],
             llm=my_llm,
@@ -65,7 +61,7 @@ class BusinessChatbot:
     def b2b_specialist(self) -> Agent:
         return Agent(
             config=self.agents_config['b2b_specialist'],
-            llm=MODEL,
+            llm=my_llm,
             allow_delegation=False,
             verbose=True
         )
@@ -74,7 +70,7 @@ class BusinessChatbot:
     def b2c_specialist(self) -> Agent:
         return Agent(
             config=self.agents_config['b2c_specialist'],
-            llm=MODEL,
+            llm=my_llm,
             allow_delegation=False,
             verbose=True
         )
@@ -121,11 +117,19 @@ class BusinessChatbot:
             agents=[self.business_expert()],
             tasks=[self.direct_consultation_task()],
             verbose=True,
+            memory=True,
+            long_term_memory=LongTermMemory(
+                storage=LTMSQLiteStorage(
+                    db_path=f"./my_project_storage"
+                )
+            ),
+            short_term_memory=ShortTermMemory(),
+            output_json=True,
         )
 
 
     @crew
-    def expert_crew2_with_rag(self, rag_tool) -> Crew:
+    def expert_crew2(self, rag_tool) -> Crew:
         """Creates an expert crew for data analysis with specific RAG tool"""
         # Temporarily set the RAG tool
         old_rag = self._rag_tool
@@ -142,9 +146,6 @@ class BusinessChatbot:
         # Restore the old RAG tool
         self._rag_tool = old_rag
         return crew
-
-    def crew(self):
-        pass
 
     @crew
     def b2c_crew(self) -> Crew:
