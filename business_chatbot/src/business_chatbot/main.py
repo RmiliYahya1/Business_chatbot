@@ -1,22 +1,20 @@
-#!/usr/bin/env python
-import sys
-import warnings
-import requests
-import tempfile
-from datetime import datetime
-import pandas as pd
+import logging
 import json
-from crewai_tools import CSVSearchTool
-from business_chatbot.src.business_chatbot.crew import BusinessChatbot
-from flask import Flask, jsonify, request, abort, Response, stream_with_context
+import time
+import threading
+import uuid
+import queue
+import requests
+from business_chatbot.src.business_chatbot.business_flow import BusinessChatbotFlow as Processor
 
-Rag=CSVSearchTool()
-warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
+from business_chatbot.src.business_chatbot.crew import BusinessChatbot
+from flask import Flask, jsonify, request, Response, stream_with_context
+
+
 from  flask_cors import CORS
-# This main file is intended to be a way for you to run your
-# crew locally, so refrain from adding unnecessary logic into this file.
-# Replace with inputs you want to test with, it will automatically
-# interpolate any tasks and agents information
+
+from business_chatbot.src.business_chatbot.tools.streaming_listener import flask_streaming_listener
+
 agents=BusinessChatbot()
 b2b_api_url = "http://15.236.152.46:8080/api/b2b/searchByAttrExact"  # @param {type:"string"}
 b2c_api_url = "http://15.236.152.46:8080/api/b2c/searchByAttrExact"
@@ -56,249 +54,210 @@ def make_post_request(url, payload, headers, params):
 
 app= Flask(__name__)
 CORS(app)
-CORS(app, resources={r"/api/crew": {"origins": "http://localhost:3002"}})
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
 @app.route('/api/crew', methods=['POST'])
-def run():
+def handle_Requests():
+    try:
+        data = request.get_json()
+        logger.info(data)
+
+        user_choice = data['choice']
+        user_input = data['input']
+        logger.info(f"Choice: {user_choice}, Input: {user_input}")
+
+        user_info = {'choice': user_choice, 'input': user_input}
+        processor = Processor()
+        crews_result = processor.kickoff(inputs=user_info)
+        logger.info(f"Crew result: {crews_result}")
+
+        if user_choice == 'default':
+            return jsonify({
+                "message": "Use streaming endpoint for default queries",
+                "streaming_url": "/api/stream"
+            }), 200
+
+        elif user_choice == 'b2c':
+            response = crews_result
+            return response
+        elif user_choice == 'b2b':
+            response = crews_result
+            return response
+    except Exception as e:
+        logger.error(f"Erreur: {str(e)}")
+        return jsonify({"response": "Désolé, une erreur s'est produite."}), 500
+
+
+@app.route('/api/stream', methods=['POST'])
+def stream_response():
     data = request.get_json()
+    user_input = data.get('input', '')
 
-    user_input = data.get('input')
-    choosed_Agent = data.get('choice')
-    input = {
-        'user_query': user_input,
-        'choice': choosed_Agent,
-    }
-    if not user_input or not choosed_Agent:
-        return jsonify({'error': 'No input provided'}), 400
+    if not user_input.strip():
+        return jsonify({'error': 'Input is required'}), 400
 
-    try:
-        if choosed_Agent == 'b2c':
-            
-            query = BusinessChatbot().b2c_crew().kickoff(inputs=input)
+    client_id = str(uuid.uuid4())
 
-            # Handle CrewOutput conversion
-            if hasattr(query, 'raw_output'):
-                query_dict = query.raw_output
-            elif hasattr(query, 'result'):
-                query_dict = query.result
-            else:
+    @stream_with_context
+    def generate():
+        try:
+            # Enregistrer le client pour le streaming
+            flask_streaming_listener.register_client(client_id)
+
+            # Envoyer le message de démarrage
+            yield f"data: {json.dumps({'type': 'start', 'message': 'Initialisation de l IA...', 'client_id': client_id})}\n\n"
+
+            # Créer et exécuter le processor dans un thread séparé
+
+            def run_processor():
                 try:
-                    query_dict = json.loads(str(query))
-                except json.JSONDecodeError:
-                    return jsonify({"error": "Failed to parse CrewAI output"}), 400
+                    user_info = {'choice': 'default', 'input': user_input}
+                    processor = Processor()
 
-            # Make API request and handle response
-            result = make_post_request(b2c_api_url, query_dict, headers, params)
+                    # Exécuter le flow (le streaming se fait via les event listeners)
+                    result = processor.kickoff(inputs=user_info)
 
-            # Ensure result is a dictionary
-            if isinstance(result, str):
+                    # Envoyer le résultat final
+                    final_data = {
+                        'type': 'final_result',
+                        'content': str(result.raw) if hasattr(result, 'raw') else str(result),
+                        'timestamp': time.time()
+                    }
+
+                    if client_id in flask_streaming_listener.client_queues:
+                        flask_streaming_listener.client_queues[client_id].put(final_data)
+
+                except Exception as e:
+                    logger.error(f"Error in processor thread: {str(e)}")
+                    error_data = {
+                        'type': 'error',
+                        'message': f'Erreur lors du traitement: {str(e)}',
+                        'timestamp': time.time()
+                    }
+
+                    try:
+                        if client_id in flask_streaming_listener.client_queues:
+                            flask_streaming_listener.client_queues[client_id].put(error_data)
+                    except Exception as put_error:
+                        logger.error(f"Error putting error data to queue: {put_error}")
+
+            # Démarrer le processor en arrière-plan
+            processor_thread = threading.Thread(target=run_processor)
+            processor_thread.daemon = True
+            processor_thread.start()
+
+            # Streamer les événements depuis la queue
+            timeout_count = 0
+            max_timeout = 30  # 30 secondes de timeout total
+
+            while flask_streaming_listener.active_streams.get(client_id, False):
                 try:
-                    result = json.loads(result)
-                except json.JSONDecodeError:
-                    return jsonify({
-                        "error": "Invalid API response format",
-                        "raw_response": result[:200]
-                    }), 400
+                    # Récupérer les données de la queue avec timeout
+                    event_data = flask_streaming_listener.client_queues[client_id].get(timeout=1)
 
-            desired_fields = [
-                "idS", "userId", "phoneNumber", "firstName", "lastName", "gender",
-                "currentCity", "currentCountry", "hometownCity", "hometownCountry",
-                "relationshipStatus", "workplace", "email", "currentDepartment", "currentRegion"
-            ]
+                    # Réinitialiser le compteur de timeout
+                    timeout_count = 0
 
-            # Process the data
-            try:
-                records = []
-                if 'results' in result:
-                    records = result['results']
-                elif 'page' in result and 'content' in result['page']:
-                    records = result['page']['content']
+                    # Envoyer les données au client
+                    yield f"data: {json.dumps(event_data)}\n\n"
 
-                filtered_records = [
-                    {field: record.get(field) for field in desired_fields}
-                    for record in records
-                    if isinstance(record, dict)
-                ]
+                    # Vérifier si le streaming est terminé
+                    if event_data.get('type') in ['complete', 'final_result', 'error']:
+                        # Envoyer un message de fin
+                        end_data = {'type': 'end', 'timestamp': time.time()}
+                        yield f"data: {json.dumps(end_data)}\n\n"
+                        break
 
-                if not filtered_records:
-                    return jsonify({"error": "No valid records found after filtering"}), 404
+                except queue.Empty:
+                    timeout_count += 1
 
-                # Create DataFrame
-                df = pd.DataFrame(records)
+                    # Envoyer un heartbeat pour maintenir la connexion
+                    heartbeat_data = {
+                        'type': 'heartbeat',
+                        'timestamp': time.time(),
+                        'timeout_count': timeout_count
+                    }
+                    yield f"data: {json.dumps(heartbeat_data)}\n\n"
 
+                    # Timeout global
+                    if timeout_count >= max_timeout:
+                        timeout_data = {
+                            'type': 'timeout',
+                            'message': 'Délai d attente dépassé',
+                                                                 'timestamp': time.time()
+                        }
+                        yield f"data: {json.dumps(timeout_data)}\n\n"
+                        break
 
-                '''response = {
-                    "status": "success",
-                    "record_count": len(df),
-                    "sample_data": df.head().to_dict('records'),
-                    "csv_data": df.to_csv(index=False, encoding='utf-8')
-                }'''
-                '''return Response(
-                df.to_csv(index=False, encoding='utf-8'),
-                    mimetype='text/csv',
-                    headers={'Content-Disposition': 'attachment; filename=data.csv'}
-                )'''
-                csv_data = df.to_csv(index=False, encoding='utf-8')
-                with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as tmp:
-                    tmp.write(csv_data)
-                    csv_path = tmp.name
+                except Exception as e:
+                    logger.error(f"Error in streaming loop: {str(e)}")
+                    error_data = {
+                        'type': 'stream_error',
+                        'message': str(e),
+                        'timestamp': time.time()
+                    }
+                    yield f"data: {json.dumps(error_data)}\n\n"
+                    break
 
-                rag = CSVSearchTool(
-                    file_path=csv_path,
-                    description="Tool to search through the provided business data"
-                )
+        except Exception as e:
+            logger.error(f"Error in stream generation: {str(e)}")
+            error_data = {
+                'type': 'generation_error',
+                'message': str(e),
+                'timestamp': time.time()
+            }
+            yield f"data: {json.dumps(error_data)}\n\n"
 
+        finally:
+            # Nettoyer les ressources du client
+            flask_streaming_listener.unregister_client(client_id)
+            logger.info(f"Streaming completed for client {client_id}")
 
-                BusinessChatbot().set_rag_tool(rag)  # Set the RAG tool
-                input.update({'dataset_info': f"Dataset loaded with {len(df)} B2C records. Use the search tool to analyze the data."})
-
-
-                response = BusinessChatbot().expert_crew2().kickoff(inputs=input)
-
-                return jsonify({
-                    "response": str(response),
-                    "csv": csv_data
-                }), 200
-            except Exception as e:
-                return jsonify({"error": f"Data processing failed: {str(e)}"}), 500
-
-        elif choosed_Agent == 'b2b':
-            query = BusinessChatbot().b2b_crew().kickoff(inputs=input)
-            print(query)
-
-            if hasattr(query, 'raw_output'):
-                query_dict = query.raw_output
-            elif hasattr(query, 'result'):
-                query_dict = query.result
-            else:
-                try:
-                    query_dict = json.loads(str(query))
-                except json.JSONDecodeError:
-                    return jsonify({"error": "Failed to parse CrewAI output"}), 400
+    return Response(
+        generate(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Cache-Control',
+            'X-Accel-Buffering': 'no'  # Pour nginx
+        }
+    )
 
 
-            result = make_post_request(b2b_api_url, query_dict, headers, params)
-            print(result)
-            # Ensure result is a dictionary
-            if isinstance(result, str):
-                try:
-                    result = json.loads(result)
-                except json.JSONDecodeError:
-                    return jsonify({"error": "Invalid API response format"}), 400
-
-            desired_fields = [
-                "place_id",
-                "city",
-                "coordinates",
-                "detailed_address",
-                "rating"
-            ]
-
-            # Process the data
-            try:
-                records = []
-                if 'results' in result:
-                    records = result['results']
-                elif 'page' in result and 'content' in result['page']:
-                    records = result['page']['content']
-
-                filtered_records = [
-                    {field: record.get(field) for field in desired_fields}
-                    for record in records
-                    if isinstance(record, dict)
-                ]
-
-                if not filtered_records:
-                    return jsonify({"error": "No valid records found after filtering"}), 404
-
-                df = pd.DataFrame(records)
-
-                '''response = {
-                    "status": "success",
-                    "record_count": len(df),
-                    "sample_data": df.head().to_dict('records'),
-                    "csv_data": df.to_csv(index=False, encoding='utf-8')
-                    "download_link": "/download-csv"
-                }'''
-                '''
-                return Response(
-                    df.to_csv(index=False, encoding='utf-8'),
-                    mimetype='text/csv',
-                    headers={'Content-Disposition': 'attachment; filename=data.csv'}
-                )'''
-                csv_data = df.to_csv(index=False, encoding='utf-8')
-                with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as tmp:
-                    tmp.write(csv_data)
-                    csv_path = tmp.name
-
-                rag = CSVSearchTool(
-                    file_path=csv_path,
-                    description="Tool to search through the provided business data"
-                )
-
-                BusinessChatbot().set_rag_tool(rag)
-                input.update({'dataset_info': f"Dataset loaded with {len(df)} B2B records. Use the search tool to analyze the data."})
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    return jsonify({
+        'status': 'healthy',
+        'active_streams': len(flask_streaming_listener.active_streams),
+        'timestamp': time.time()
+    })
 
 
-                response = BusinessChatbot().expert_crew2().kickoff(inputs=input)
-                return jsonify({"response": str(response)
-                                   , "csv": csv_data}), 200
+# Gestionnaire d'erreurs pour les routes streaming
+@app.errorhandler(Exception)
+def handle_streaming_error(error):
+    if request.path.startswith('/api/stream'):
+        logger.error(f"Streaming error: {str(error)}")
 
-            except Exception as e:
-                return jsonify({"error": f"Data processing failed: {str(e)}"}), 500
-        else:
-            try:
-                result = BusinessChatbot().expert_crew1().kickoff(inputs=input)
-                return jsonify({"response": str(result)})
+        def error_stream():
+            error_data = {
+                'type': 'server_error',
+                'message': 'Erreur interne du serveur',
+                'timestamp': time.time()
+            }
+            yield f"data: {json.dumps(error_data)}\n\n"
 
-            except Exception as e:
-                 return jsonify({"error": f"Data processing failed: {str(e)}"}), 500
+        return Response(error_stream(), mimetype='text/event-stream', status=500)
 
-    except Exception as e:
-        return jsonify({"error": f"An error occurred while running the crew: {str(e)}"}), 500
-
-
-    except Exception as e:
-
-          return jsonify({"error": f"Initialization failed: {str(e)}"}), 500
-
-def train():
-    """
-    Train the crew for a given number of iterations.
-    """
-    inputs = {
-        "topic": "AI LLMs",
-        'current_year': str(datetime.now().year)
-    }
-    try:
-        BusinessChatbot().crew().train(n_iterations=int(sys.argv[1]), filename=sys.argv[2], inputs=inputs)
-
-
-    except Exception as e:
-        print(f"\nUne erreur critique est survenue pendant l'exécution du crew : {e}")
-
-
-def replay():
-    """
-    Relance l'exécution d'un crew à partir d'une tâche spécifique (pour le débogage).
-    """
-    if len(sys.argv) < 2:
-        print("Usage: python main.py replay <task_id>")
-        return
-
-    task_id = sys.argv[1]
-    print(f"=== Tentative de Replay pour la tâche : {task_id} ===")
-
-    try:
-        BusinessChatbot().crew().replay(task_id=task_id)
-    except Exception as e:
-        print(f"Erreur lors du replay : {e}")
-
-
-
-    except Exception as e:
-        raise Exception(f"An error occurred while testing the crew: {e}")
+    return jsonify({'error': 'Internal server error'}), 500
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=3002)
+    # Importer et initialiser l'event listener
+    print("Initializing streaming event listener...")
 
+    app.run(debug=True, port=3002, threaded=True)

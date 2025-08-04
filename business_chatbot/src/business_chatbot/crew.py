@@ -1,56 +1,43 @@
-from crewai import Agent, Crew, Process, Task
+from crewai import Agent, Crew, Process, Task, LLM
 from crewai.agents.agent_builder.base_agent import BaseAgent
+from crewai.project import CrewBase, agent, crew, task
+import os, queue
+from dotenv import load_dotenv
 from crewai.memory import LongTermMemory, ShortTermMemory
 from uuid import uuid4
 from crewai.memory.storage.ltm_sqlite_storage import LTMSQLiteStorage
-from crewai.project import CrewBase, agent, crew, task
-from typing import List, Optional
-import os
-from dotenv import load_dotenv
-from tools.custom_tool import CSVFileCreatorTool
-from crewai_tools import CSVSearchTool
+from business_chatbot.src.business_chatbot.tools.custom_tool import CSVFileCreatorTool
 
 load_dotenv()
 MODEL = os.getenv('MODEL')
+token_queue = queue.Queue()
 csv_tool = CSVFileCreatorTool()
 os.environ["CREWAI_STORAGE_DIR"] = "./my_project_storage"
 
+
+my_llm = LLM(
+    model=f"openai/{MODEL}",
+    api_key=os.getenv("OPENAI_API_KEY"),
+    stream=True,
+    temperature=0.7,
+)
+
 @CrewBase
 class BusinessChatbot:
-    """BusinessChatbot crew"""
-    agents: List[BaseAgent]
-    tasks: List[Task]
+    """BusinessChatbot crews"""
 
-    agents_config = "config/agents.yaml"
+    agents_config="config/agents.yaml"
     tasks_config = "config/tasks.yaml"
 
     def __init__(self):
         super().__init__()
         self._rag_tool = None  # Store the RAG tool as an instance variable
 
-
     def set_rag_tool(self, rag_tool):
         """Set the RAG tool to be used by the business expert"""
         self._rag_tool = rag_tool
 
-    @agent
-    def b2b_specialist(self) -> Agent:
-        return Agent(
-            config=self.agents_config['b2b_specialist'],
-            llm=MODEL,
-            allow_delegation=False,
-            verbose=True
-        )
-
-    @agent
-    def b2c_specialist(self) -> Agent:
-        return Agent(
-            config=self.agents_config['b2c_specialist'],
-            llm=MODEL,
-            allow_delegation=False,
-            verbose=True
-        )
-
+#------------------------------------------------------------AGENTS--------------------------------------------------------------------------
     @agent
     def business_expert(self) -> Agent:
         """Business expert agent with optional RAG tool"""
@@ -60,14 +47,37 @@ class BusinessChatbot:
 
         return Agent(
             config=self.agents_config['business_expert'],
-            llm=MODEL,
+            llm=my_llm,
             allow_delegation=False,
+            memory=True,
             verbose=True,
             tools=tools,
             respect_context_window=False,
             max_iter=1,
-            memory=True
         )
+
+
+    @agent
+    def b2b_specialist(self) -> Agent:
+        return Agent(
+            config=self.agents_config['b2b_specialist'],
+            llm=my_llm,
+            allow_delegation=False,
+            verbose=True
+        )
+
+    @agent
+    def b2c_specialist(self) -> Agent:
+        return Agent(
+            config=self.agents_config['b2c_specialist'],
+            llm=my_llm,
+            allow_delegation=False,
+            verbose=True
+        )
+
+
+# ------------------------------------------------------------TASKS--------------------------------------------------------------------------
+
 
     @task
     def b2b_retreiving(self) -> Task:
@@ -87,7 +97,7 @@ class BusinessChatbot:
     def direct_consultation_task(self) -> Task:
         return Task(
             config=self.tasks_config['direct_consultation'],
-            agent=self.business_expert()
+            agent=self.business_expert(),
         )
 
     @task
@@ -96,6 +106,45 @@ class BusinessChatbot:
             config=self.tasks_config['data_analysis_synthesis'],
             agent=self.business_expert()
         )
+
+# ------------------------------------------------------------CREWS--------------------------------------------------------------------------
+
+    @crew
+    def consultation_direct(self) -> Crew:
+        """Crew pour consultation directe"""
+        return Crew(
+            agents=[self.business_expert()],
+            tasks=[self.direct_consultation_task()],
+            process=Process.sequential,
+            verbose=True,
+            memory=True,
+            long_term_memory=LongTermMemory(
+                storage=LTMSQLiteStorage(
+                    db_path=f"./my_project_storage"
+                )
+            ),
+            short_term_memory=ShortTermMemory(),
+            output_json=True,
+        )
+
+    @crew
+    def expert_crew2(self, rag_tool) -> Crew:
+        """Creates an expert crew for data analysis with specific RAG tool"""
+        # Temporarily set the RAG tool
+        old_rag = self._rag_tool
+        self._rag_tool = rag_tool
+
+        crew = Crew(
+            agents=[self.business_expert()],
+            tasks=[self.data_analysis_synthesis_task()],
+            process=Process.sequential,
+            verbose=True,
+            output_json=True
+        )
+
+        # Restore the old RAG tool
+        self._rag_tool = old_rag
+        return crew
 
     @crew
     def b2c_crew(self) -> Crew:
@@ -119,66 +168,8 @@ class BusinessChatbot:
             output_json=True
         )
 
-    @crew
-    def expert_crew(self) -> Crew:
-        """Creates an expert crew with business expert"""
-        return Crew(
-            agents=[self.business_expert()],
-            tasks=[self.direct_consultation_task(), self.data_analysis_synthesis_task()],
-            process=Process.sequential,
-            verbose=True,
-            output_json=True
-        )
 
-    @crew
-    def expert_crew1(self) -> Crew:
-        """Creates an expert crew for consultation only"""
-        return Crew(
-            agents=[self.business_expert()],
-            tasks=[self.direct_consultation_task()],
-            process=Process.sequential,
-            verbose=True,
-            memory=True,
-            long_term_memory=LongTermMemory(
-                storage=LTMSQLiteStorage(
-                    db_path=f"./my_project_storage"
-                )
-            ),
-            short_term_memory=ShortTermMemory(),
-            output_json=True,
-        )
 
-    @crew
-    def expert_crew2(self) -> Crew:
-        """Creates an expert crew for data analysis"""
-        return Crew(
-            agents=[self.business_expert()],
-            tasks=[self.data_analysis_synthesis_task()],
-            process=Process.sequential,
-            verbose=True,
-            output_json=True
-        )
-
-    def expert_crew2_with_rag(self, rag_tool) -> Crew:
-        """Creates an expert crew for data analysis with specific RAG tool"""
-        # Temporarily set the RAG tool
-        old_rag = self._rag_tool
-        self._rag_tool = rag_tool
-
-        crew = Crew(
-            agents=[self.business_expert()],
-            tasks=[self.data_analysis_synthesis_task()],
-            process=Process.sequential,
-            verbose=True,
-            output_json=True
-        )
-
-        # Restore the old RAG tool
-        self._rag_tool = old_rag
-        return crew
-
-    def crew(self):
-        pass
 
 
 
