@@ -320,7 +320,6 @@ b2c_retreiving:
   agent: b2c_specialist
 
 
-
 direct_consultation:
   description: >
     Réponds à la demande de l'utilisateur suivante : {user_query}
