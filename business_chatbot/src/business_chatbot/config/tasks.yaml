@@ -144,7 +144,7 @@ b2b_retreiving:
       "":""
       }
   agent: b2b_specialist
-  output_file: None
+
 
 b2c_retreiving:
   description: >
@@ -318,7 +318,7 @@ b2c_retreiving:
     "":""
     }
   agent: b2c_specialist
-  output_file: None
+
 
 
 direct_consultation:
@@ -347,7 +347,6 @@ data_analysis_synthesis:
     2. Examiner un échantillon de données aléatoirement CSV fournies : {dataset_info}
     3. Extraire les insights clés et tendances significatives
     5. Corréler les données avec la demande utilisateur initiale
-    6. Synthétiser les findings en recommandations business
 
     
     Priorité à l'interprétation métier des données techniques.
@@ -359,7 +358,6 @@ data_analysis_synthesis:
     - Une section de contextualisation de l'analyse
     - Une section de synthèse des insights clés extraits des données
     - Une section d'interprétation business des tendances identifiées
-    - Une section de recommandations stratégiques basées sur les données
   
     L'agent doit choisir des titres de sections (## Titre) qui reflètent naturellement 
     les insights découverts et le type d'analyse B2B/B2C effectuée.
@@ -371,5 +369,5 @@ data_analysis_synthesis:
     - Focus sur l'actionnable business
   agent: business_expert
   context: []  # Sera rempli dynamiquement avec les données CSV
-  output_file: "analysis_response.md"
+
 

@@ -163,7 +163,7 @@ class BusinessChatbotFlow(Flow[UserChoice]):
 
             # 8. ✅ SOLUTION CORRIGÉE : Utiliser expert_crew2 correctement
             BusinessChatbot().set_rag_tool(rag)  # Set the RAG tool
-            inputs_dict.update({'dataset_info': f"Dataset loaded with {len(df)} B2C records. Use the search tool to analyze a random sample of  data."})
+            inputs_dict.update({'dataset_info': f"Dataset loaded with {len(df)} B2B records. Use the search tool to analyze a random sample of  data."})
 
             logger.info("Calling expert_crew2 for analysis...")
             # ✅ Appel correct de expert_crew2 (paramètre positionnel)
