@@ -14,7 +14,7 @@ load_dotenv()
 MODEL = os.getenv('MODEL')
 token_queue = queue.Queue()
 csv_tool = CSVFileCreatorTool()
-os.environ["CREWAI_STORAGE_DIR"] = "./my_project_storage"
+
 
 
 my_llm = LLM(

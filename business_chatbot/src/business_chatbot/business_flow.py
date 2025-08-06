@@ -93,95 +93,128 @@ class BusinessChatbotFlow(Flow[UserChoice]):
         user_query = self.state.input
         inputs_dict = {'user_query': user_query}
 
-        try:
-            logger.info("Starting B2B consultation...")
+        def generate_response():
+            try:
+                logger.info("Starting B2B consultation...")
+                yield f"data: {json.dumps({'status': 'starting', 'message': 'Initializing B2B extraction process...', 'progress': 10})}\n\n"
 
-            # 1. Générer la requête avec le crew B2B
-            query = self.business_chatbot.b2b_crew().kickoff(inputs=inputs_dict)
-            logger.info(f"B2B Query result: {query}")
+                # 1. Generate query with B2B crew
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Generating query with B2B crew...', 'progress': 20})}\n\n"
+                query = self.business_chatbot.b2b_crew().kickoff(inputs=inputs_dict)
+                logger.info(f"B2B Query result: {query}")
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'B2B crew query generated successfully', 'progress': 30})}\n\n"
 
-            # 2. Handle CrewOutput conversion
-            if hasattr(query, 'raw_output'):
-                query_dict = query.raw_output
-            elif hasattr(query, 'result'):
-                query_dict = query.result
-            else:
-                try:
-                    query_dict = json.loads(str(query))
-                except json.JSONDecodeError:
-                    return jsonify({"error": "Failed to parse CrewAI output"}), 400
+                # 2. Handle CrewOutput conversion
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Processing output...', 'progress': 35})}\n\n"
+                if hasattr(query, 'raw_output'):
+                    query_dict = query.raw_output
+                elif hasattr(query, 'result'):
+                    query_dict = query.result
+                else:
+                    try:
+                        query_dict = json.loads(str(query))
+                    except json.JSONDecodeError:
+                        yield f"data: {json.dumps({'status': 'error', 'message': 'Failed to parse CrewAI output', 'progress': 35})}\n\n"
+                        return
 
-            logger.info("Making API request...")
-            # 3. Make API request
-            result = make_post_request(b2b_api_url, query_dict, headers, params)
+                # 3. Make API request
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Making API request to fetch data...', 'progress': 40})}\n\n"
+                result = make_post_request(b2b_api_url, query_dict, headers, params)
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'API request completed', 'progress': 50})}\n\n"
 
-            if isinstance(result, str):
-                try:
-                    result = json.loads(result)
-                except json.JSONDecodeError:
-                    return jsonify({"error": "Invalid API response format"}), 400
+                if isinstance(result, str):
+                    try:
+                        result = json.loads(result)
+                    except json.JSONDecodeError:
+                        yield f"data: {json.dumps({'status': 'error', 'message': 'Invalid API response format', 'progress': 50})}\n\n"
+                        return
 
-            # 4. Process data
-            desired_fields = [
-                "place_id", "name", "city", "coordinates",
-                "detailed_address", "rating", "phone", "opening_hours"
-            ]
+                # 4. Process data
+                desired_fields = [
+                    "placeId", "name", "description", "isSpendingOnAds", "reviews", "rating",
+                    "website", "mockEmail", "phone", "canClaim", "ownerId", "ownerName",
+                    "ownerLink", "featuredImage", "mainCategory", "categories", "workdayTiming",
+                    "isTemporarilyClosed", "isPermanentlyClosed", "closedOn", "address",
+                    "link", "status", "priceRange", "featuredQuestion", "reviewsLink",
+                    "latitude", "longitude", "plusCode", "ward", "street", "city",
+                    "postalCode", "state", "countryCode", "timeZone", "cid", "dataId",
+                    "about", "images", "hours", "popularTimes", "mostPopularTimes",
+                    "featuredReviews", "detailedReviews", "query", "score", "scoreCategory",
+                    "competitors", "reviewKeywords", "reviewsPerRating", "coordinates"
+                ]
 
-            records = []
-            if 'results' in result:
-                records = result['results']
-            elif 'page' in result and 'content' in result['page']:
-                records = result['page']['content']
+                records = []
+                if 'results' in result:
+                    records = result['results']
+                elif 'page' in result and 'content' in result['page']:
+                    records = result['page']['content']
 
-            if not records:
-                return jsonify({"error": "No records found"}), 404
+                if not records:
+                    yield f"data: {json.dumps({'status': 'error', 'message': 'No records found in API response', 'progress': 60})}\n\n"
+                    return
 
-            records = [
-                record for record in records if isinstance(record, dict)
-            ]
+                records = [record for record in records if isinstance(record, dict)]
+                if not records:
+                    yield f"data: {json.dumps({'status': 'error', 'message': 'No valid records after filtering', 'progress': 60})}\n\n"
+                    return
 
-            if not records:
-                return jsonify({"error": "No valid records after filtering"}), 404
+                logger.info(f"Processed {len(records)} B2B records")
+                yield f"data: {json.dumps({'status': 'processing', 'message': f'Found {len(records)} valid records', 'progress': 65})}\n\n"
 
-            logger.info(f"Processed {len(records)} B2B records")
+                # 5. Create CSV
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Creating CSV from processed data...', 'progress': 70})}\n\n"
+                df = pd.DataFrame(records)
+                # Filter for columns that actually exist in the DataFrame
+                available_columns = [col for col in desired_fields if col in df.columns]
+                df1 = df[available_columns]
+                csv_data = df1.to_csv(index=False, encoding='utf-8')
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'CSV generated successfully', 'progress': 75})}\n\n"
 
+                # 6. Create RAG analysis
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as tmp:
+                    tmp.write(csv_data)
+                    csv_path = tmp.name
+                    logger.info(f"Created temporary CSV at: {csv_path}")
 
-            df = pd.DataFrame(records)
-            csv_data = df.to_csv(index=False, encoding='utf-8')
+                    yield f"data: {json.dumps({'status': 'processing', 'message': 'Setting up RAG analysis tool...', 'progress': 80})}\n\n"
+                    rag = CSVSearchTool(
+                        file_path=csv_path,
+                        description="Tool to search through the provided B2B business data"
+                    )
 
+                    BusinessChatbot().set_rag_tool(rag)
+                    inputs_dict.update({
+                        'dataset_info': f"Dataset loaded with {len(df)} B2B records. Use the search tool to analyze a random sample of data."
+                    })
 
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as tmp:
-                tmp.write(csv_data)
-                csv_path = tmp.name
+                    yield f"data: {json.dumps({'status': 'processing', 'message': 'Starting expert analysis of the data...', 'progress': 85})}\n\n"
+                    logger.info("Calling expert_crew2 for analysis...")
+                    response = BusinessChatbot().expert_crew2().kickoff(inputs=inputs_dict)
+                    yield f"data: {json.dumps({'status': 'processing', 'message': 'Expert analysis completed', 'progress': 95})}\n\n"
 
-            logger.info(f"Created temporary CSV at: {csv_path}")
+                    # Final result
+                    final_result = {
+                        "status": "success",
+                        "response": str(response),
+                        "csv": csv_data,
+                        "headers": df.columns.tolist()
+                    }
+                    yield f"data: {json.dumps(final_result)}\n\n"
+                    yield f"data: {json.dumps({'status': 'completed', 'message': 'B2B extraction and analysis completed successfully', 'progress': 100})}\n\n"
 
+            except Exception as e:
+                logger.error(f"B2B extraction error: {str(e)}")
+                yield f"data: {json.dumps({'status': 'error', 'message': f'Data processing failed: {str(e)}', 'progress': -1})}\n\n"
 
-            rag = CSVSearchTool(
-                file_path=csv_path,
-                description="Tool to search through the provided B2B business data"
-            )
-
-
-            BusinessChatbot().set_rag_tool(rag)  # Set the RAG tool
-            inputs_dict.update({'dataset_info': f"Dataset loaded with {len(df)} B2C records. Use the search tool to analyze a random sample of  data."})
-
-            logger.info("Calling expert_crew2 for analysis...")
-
-            response = BusinessChatbot().expert_crew2().kickoff(inputs=inputs_dict)
-
-            logger.info("Analysis completed successfully")
-
-            return jsonify({
-                "response": str(response),
-                "csv": csv_data
-            }), 200
-
-        except Exception as e:
-            logger.error(f"B2B consultation error: {str(e)}")
-            import traceback
-            logger.error(f"Full traceback: {traceback.format_exc()}")
-            return jsonify({"error": f"Data processing failed: {str(e)}"}), 500
+        return Response(
+            generate_response(),
+            mimetype='text/event-stream',
+            headers={
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive'
+            }
+        )
 
     @listen('b2c')
     def b2c_extraction(self):
@@ -199,7 +232,7 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                 yield f"data: {json.dumps({'status': 'processing', 'message': 'B2C crew query generated successfully', 'progress': 30})}\n\n"
 
                 # 2. Handle CrewOutput conversion
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'Processing CrewAI output...', 'progress': 35})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Processing output...', 'progress': 35})}\n\n"
                 if hasattr(query, 'raw_output'):
                     query_dict = query.raw_output
                 elif hasattr(query, 'result'):
@@ -284,7 +317,8 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                 final_result = {
                     "status": "success",
                     "response": str(response),
-                    "csv": csv_data
+                    "csv": csv_data,
+                    "headers": df.columns.tolist()
                 }
                 yield f"data: {json.dumps(final_result)}\n\n"
 
