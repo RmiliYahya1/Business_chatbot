@@ -1,108 +1,3 @@
-direct_consultation:
-  description: >
-    En tant qu'expert senior en marketing data, comportement d'achat et intelligence commerciale, 
-    votre rôle est d'analyser et de répondre aux questions relevant directement de votre expertise.
-
-    CONTEXTE :
-    L'utilisateur pose une question générale. Votre objectif est de déterminer si cette question 
-    nécessite une expertise immédiate en marketing, business intelligence ou comportement d'achat.
-
-    PROCESSUS À SUIVRE :
-    1. **VÉRIFIER L'INTENTION ET LA PERTINENCE DE LA REQUÊTE**
-       - Lisez attentivement la requête de l'utilisateur : {user_query}.
-       - **Critères de pertinence :** La requête doit être clairement liée au **marketing stratégique**, à l'**analyse des comportements d'achat** (B2B/B2C), ou à la **business intelligence** (collecte, analyse, interprétation de données business).
-       - **Exemples de requêtes NON PERTINENTES :** Questions de culture générale, recettes de cuisine, conseils techniques non liés au business (ex: comment réparer un ordinateur), aide à la rédaction de documents personnels, sujets non professionnels.
-       - **Si la requête est une simple salutation** ("hello", "bonjour", "salut") : Répondez poliment et concise-ment (ex: "Bonjour ! Comment puis-je vous aider aujourd'hui ?").
-       - **Si la requête n'est PAS PERTINENTE pour votre rôle d'expert (marketing/BI)** : Répondez poliment que la question dépasse votre domaine d'expertise et proposez de l'aider sur des sujets pertinents. Exemple : "Bonjour ! En tant qu'expert en marketing et business intelligence, je suis spécialisé dans les stratégies commerciales et l'analyse de données. Votre question sur [reformuler brièvement la question de l'utilisateur] dépasse mon domaine d'expertise. Puis-je vous aider sur des sujets liés à la business intelligence, au marketing ou au comportement d'achat ?"
-       - **Si l'intention est vague MAIS POTENTIELLEMENT PERTINENTE (ex: "J'ai besoin de conseils business")** : Demandez poliment des précisions. Exemple : "Bonjour, je suis un expert en marketing et business intelligence. Pourriez-vous me donner plus de détails sur ce que vous souhaitez accomplir dans le domaine du marketing ou de l'analyse de données ?"
-
-    2. **SI LA REQUÊTE EST PERTINENTE POUR VOTRE EXPERTISE, ALORS PROCÉDEZ À L'ANALYSE :**
-
-       COMPRENDRE - Analyse l'intention réelle derrière la question
-       - Identifie le secteur d'activité implicite ou explicite
-       - Détermine le niveau de maturité business de l'interlocuteur
-       
-       CONTEXTUALISER - Situe la problématique dans son environnement
-       - Tendances marché actuelles pertinentes
-       - Enjeux business typiques du secteur
-       - Défis communs rencontrés
-       
-       ANALYSER - Applique ton expertise pour identifier
-       - Les facteurs clés de succès
-       - Les risques potentiels
-       - Les opportunités cachées
-       
-       RECOMMANDER - Propose des actions concrètes
-       - Solutions court terme (quick wins)
-       - Stratégies moyen/long terme
-       - KPIs à suivre pour mesurer le succès
-    
-    STYLE DE RÉPONSE :
-    - Ton professionnel mais accessible
-    - Exemples concrets du monde réel
-    - Chiffres et statistiques pertinents si applicable
-    - Éviter le jargon inutile
-  expected_output: >
-    Une réponse concise et appropriée si la question est une salutation ou n'est pas pertinente.
-    Sinon, une réponse consultative structurée en markdown, organisée naturellement selon 
-    le contexte de la question. L'agent doit créer des sections pertinentes (## Titre) 
-    qui s'articulent logiquement.
-    FORMAT ATTENDU (pour une consultation pertinente) :
-    - Commencer par une phrase d'accroche qui reformule et valide la compréhension
-    - Développer l'analyse en 3-4 sections avec des titres adaptés au sujet
-    - Inclure des points d'action concrets et numérotés
-    - Conclure avec les prochaines étapes recommandées
-    La réponse doit être immédiatement actionnable et démontrer une expertise approfondie
-    tout en restant compréhensible pour un dirigeant non-technique.
-    Longueur cible : 250-400 mots, structurés et aérés pour une lecture facile.
-
-
-
-data_analysis_synthesis:
-  description: >
-    Interpréter et synthétiser des données CSV B2B ou B2C générées par les agents spécialisés,
-    puis créer une réponse enrichie pour l'utilisateur final.
-    Les données brutes sont fournies dans le contexte : {csv_data}.
-    
-    Cette tâche est activée quand un bouton (B2B ou B2C) est sélectionné et que des données
-    structurées sont disponibles via le contexte de la tâche.
-    
-    Processus à suivre :
-    1. Analyser l'input utilisateur original pour comprendre son besoin  : {demande}
-    2. Examiner les données CSV fournies : {csv_data}
-    3. Extraire les insights clés et tendances significatives
-    4.**IMPORTANT : Utilise l'outil 'CSV File Creator' pour sauvegarder les données {csv_data} dans un fichier.**
-    5. Corréler les données avec la demande utilisateur initiale
-    6. Synthétiser les findings en recommandations business
-    7. Intégrer le lien de téléchargement du fichier CSV fournies dans le contexte dans la réponse finale
-    
-    Priorité à l'interprétation métier des données techniques.
-    La valeur ajoutée réside dans la transformation d'insights data en stratégies exploitables.
-  expected_output: >
-    Une réponse analytique complète en format markdown avec des titres pertinents choisis par l'agent.
-    
-    Structure recommandée (titres à adapter selon le contexte et les données) :
-    - Une section de contextualisation de l'analyse
-    - Une section de synthèse des insights clés extraits des données
-    - Une section d'interprétation business des tendances identifiées
-    - Une section de recommandations stratégiques basées sur les données
-    - Mention explicite du fichier CSV avec lien : "📊 [Télécharger les données complètes](lien_csv)"
-    
-    L'agent doit choisir des titres de sections (## Titre) qui reflètent naturellement 
-    les insights découverts et le type d'analyse B2B/B2C effectuée.
-    
-    Contraintes :
-    - Maximum 350 mots
-    - Ton analytique mais accessible
-    - Utiliser des titres markdown appropriés (## Titre)  
-    - Focus sur l'actionnable business
-    - Lien CSV obligatoire et bien visible
-  agent: business_expert
-  context: []  # Sera rempli dynamiquement avec les données CSV
-  guardrail: "Vérifier que la réponse inclut une analyse des données CSV, et contient un lien de téléchargement clairement visible"
-
-
-
 b2b_retreiving:
   description: >
     Transforme cette requête de recherche B2B : {user_query} en forme JSON.
@@ -222,6 +117,26 @@ b2b_retreiving:
         {"input": "Aidez-moi à comprendre quels cabinets de conseil à New York remportent le plus d'engagements clients de haut niveau et investissent massivement dans le développement commercial", "output": '{"city": "New York", "mainCategory": "Business management consultant", "rating": 4, "isSpendingOnAds": true, "description": "high-profile client business development"}'},
         {"input": "J'analyse les parts de marché pour les chaînes de cafés versus les opérateurs indépendants à Portland - j'ai besoin de données sur les établissements franchisés et locaux", "output": '{"city": "Portland", "mainCategory": "Coffee shop", "description": "market share chains independent franchise locally-owned"}'},
         {"input": "Notre cabinet fait du benchmarking des cabinets d'avocats à Londres, spécifiquement ceux qui servent les multinationales et ont une présence internationale significative", "output": '{"city": "London", "mainCategory": "Law firm", "rating": 4, "description": "benchmarking multinational corporations international presence"}'},
+        
+        {"input": "format téléphone international +33", "output": '{"phone": "+33"}'},
+        {"input": "numéros de téléphone avec extensions", "output": '{"phone": "555-1234 ext 100"}'},
+        {"input": "numéros mobiles vs fixes", "output": '{"phone": "mobile"}'},
+        {"input": "numéros gratuits", "output": '{"phone": "800"}'},
+        {"input": "numéros de téléphone incomplets", "output": '{"phone": "555-"}'}
+        {"input": "format international UK", "output": "{\"phone\": \"+44 20 7946 0958\"}"}
+        {"input": "format téléphone USA", "output": "{\"phone\": \"+1 212-555-1234\"}"}
+        
+        {"input": "Cafés qui ferment leur portes à dimanche" , "output":'{"mainCategory": "Coffee shop","closedOn":"\"\[\'Sunday\'\]\""}'
+        {"input": "Cafés qui ferment leur portes à samedi à lundi" , "output":'{"mainCategory": "Coffee shop","closedOn":"\"\[\'Monday\',\'Saturday\',\'Sunday'\]\""}'
+        {"input": "Restaurants fermés le mercredi", "output": '{"mainCategory": "Restaurant", "closedOn": "\"\['Wednesday'\]\""}'
+        
+        {"input": "emails d'entreprise avec sous-domaines", "output": '{"email": \"company\.co\.uk\"}'},
+        {"input": "adresses email universitaires", "output": '{"email": \"university\.edu\"}'},
+        {"input": "domaines email gouvernementaux", "output": '{"email": "\.gov"}'},
+        {"input": "extensions email internationales", "output": '{"email": "\.de"}'},
+        {"input": "formats email non standard", "output": '{"email": "custom-domain.info"}'},
+    
+        tu te limite dans les attributs suivants :[placeId,name,description,isSpendingOnAds,reviews,rating,competitors,website,mockEmail,phone,canClaim,ownerId,ownerName,ownerLink,featuredImage,mainCategory,categories,workdayTiming,isTemporarilyClosed,isPermanentlyClosed,closedOn,address,reviewKeywords,link,status,priceRange,reviewsPerRating,featuredQuestion,reviewsLink,latitude,longitude,coordinates,plusCode,ward,street,city,postalCode,state,countryCode,timeZone,cid,dataId,about,images,hours,popularTimes,mostPopularTimes,featuredReviews,detailedReviews,query,score,scoreCategory]
 
   expected_output: >
     {
@@ -229,7 +144,6 @@ b2b_retreiving:
       "":""
       }
   agent: b2b_specialist
-  output_file: None
 
 
 b2c_retreiving:
@@ -395,14 +309,65 @@ b2c_retreiving:
             {"input": "Les hommes d'origine Chinoise", "output": {"hometownCountry": "China"}},
             {"input": "Les hommes d'origine Japonaise", "output": {"hometownCountry": "Japan"}},
             {"input": "Les hommes d'origine Australienne", "output": {"hometownCountry": "Australia"}}
-
+            {"input": "Les hommes d'origine senegalaise", "output": {"hometownCountry": "Senegal"}}
+    
+        tu te limite dans les attributs suivants :[idS,userId,phoneNumber,firstName,lastName,gender,currentCity,currentCountry,hometownCity,hometownCountry,relationshipStatus,workplace,email,currentDepartment,currentRegion]
   expected_output: >
     {
     "":"",
     "":""
     }
   agent: b2c_specialist
-  output_file: None
 
+
+
+direct_consultation:
+  description: >
+    Réponds à la demande suivante de l'utilisateur : {user_query}
+    Analyser la demande textuelle de l'utilisateur et fournir une réponse experte immédiate
+    en tant qu'analyste senior en marketing data et intelligence commerciale.
+
+
+  expected_output: >
+    Une réponse consultative complète et liée au questions précédentes
+  agent: business_expert
+  output_file: "direct_response.md"
+
+data_analysis_synthesis:
+  description: >
+    Interpréter et synthétiser un échantillon de données CSV B2B ou B2C générées par les agents spécialisés,
+    puis créer une réponse enrichie pour l'utilisateur final.
+    Les données ou vous allez prendre un échantillon sont fournies dans le contexte : {dataset_info}.
+    
+    Cette tâche est activée quand un bouton (B2B ou B2C) est sélectionné et que des données
+    structurées sont disponibles via le contexte de la tâche.
+    
+    Processus à suivre :
+    1. Analyser l'input utilisateur original pour comprendre son besoin  : {user_query}
+    2. Examiner un échantillon de données aléatoirement CSV fournies : {dataset_info}
+    3. Extraire les insights clés et tendances significatives
+    5. Corréler les données avec la demande utilisateur initiale
+
+    
+    Priorité à l'interprétation métier des données techniques.
+    La valeur ajoutée réside dans la transformation d'insights data en stratégies exploitables.
+  expected_output: >
+    Une réponse analytique complète en format markdown avec des titres pertinents choisis par l'agent.
+    
+    Structure recommandée (titres à adapter selon le contexte et les données) :
+    - Une section de contextualisation de l'analyse
+    - Une section de synthèse des insights clés extraits des données
+    - Une section d'interprétation business des tendances identifiées
+  
+    L'agent doit choisir des titres de sections (## Titre) qui reflètent naturellement 
+    les insights découverts et le type d'analyse B2B/B2C effectuée.
+    
+    Contraintes :
+    - Maximum 350 mots
+    - Ton analytique mais accessible
+    - Utiliser des titres markdown appropriés (## Titre)  
+    - Focus sur l'actionnable business
+  agent: business_expert
+  context: []  # Sera rempli dynamiquement avec les données CSV
 
 

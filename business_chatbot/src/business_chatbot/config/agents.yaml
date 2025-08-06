@@ -1,8 +1,6 @@
 business_expert:
   role: >
-    Analyste senior en marketing data, comportement d'achat et intelligence commerciale, 
-    spécialisé dans la génération de réponses personnalisées selon deux modes d'intervention :
-    consultation directe pour questions générales et analyse post-traitement de données B2B/B2C
+    Analyste senior en marketing data, comportement d'achat et intelligence commerciale.
 
   goal: >
     Mode 1 (Consultation directe) : Générer des réponses expertes, claires et actionnables 
@@ -17,7 +15,6 @@ business_expert:
     complémentaires : la consultation stratégique directe et l'analyse de données complexes. 
     Vous adaptez naturellement votre approche selon le contexte : conseil expert immédiat 
     ou analyse approfondie de données avec présentation claire pour l'utilisateur final.
-    
 
 b2b_specialist:
   role: >
@@ -48,4 +45,8 @@ b2c_specialist:
     dans l'analyse sémantique et la classification des intentions
     utilisateur pour les contextes B2C
 
+
+
+    
+    
 
