@@ -73,18 +73,12 @@ def handle_Requests():
         crews_result = processor.kickoff(inputs=user_info)
         logger.info(f"Crew result: {crews_result}")
 
-        if user_choice == 'default':
-            return jsonify({
-                "message": "Use streaming endpoint for default queries",
-                "streaming_url": "/api/stream"
-            }), 200
 
-        elif user_choice == 'b2c':
-            response = crews_result
-            return response
-        elif user_choice == 'b2b':
-            response = crews_result
-            return response
+
+        if user_choice in ['b2c', 'b2b']:
+            return crews_result
+
+
     except Exception as e:
         logger.error(f"Erreur: {str(e)}")
         return jsonify({"response": "Désolé, une erreur s'est produite."}), 500
@@ -255,6 +249,50 @@ def handle_streaming_error(error):
 
     return jsonify({'error': 'Internal server error'}), 500
 
+
+app.route('/api/stream1', methods=['POST'])
+def handle_streaming_requests():
+    try:
+        data = request.get_json()
+        user_choice = data.get('choice')
+        user_input = data.get('input')
+
+        if user_choice != 'b2c':
+            return jsonify({"error": "This endpoint only supports B2C streaming requests"}), 400
+
+        def progress_generator():
+            user_info = {'choice': user_choice, 'input': user_input}
+            processor = Processor()
+
+            # Yield progress updates directly from processor
+            for update in processor.kickoff(inputs=user_info):
+                yield f"data: {json.dumps(update)}\n\n"
+
+        response = Response(
+            progress_generator(),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+                'Connection': 'keep-alive',
+                'X-Accel-Buffering': 'no',  # Nginx
+                'X-Sendfile-Type': '',  # Apache
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Cache-Control'
+            }
+        )
+
+        # Disable buffering at the response level
+        response.implicit_sequence_conversion = False
+        return response
+
+    except Exception as e:
+        logger.error(f"Streaming error: {str(e)}")
+        return Response(
+            f"data: {json.dumps({'status': 'error', 'message': str(e)})}\n\n",
+            mimetype='text/event-stream'
+        )
 
 if __name__ == '__main__':
     # Importer et initialiser l'event listener
