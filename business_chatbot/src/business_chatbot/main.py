@@ -1,101 +1,302 @@
-#!/usr/bin/env python
-import sys
-import warnings
-from crew import BusinessChatbot
+import logging
+import json
+import time
+import threading
+import uuid
+import queue
+import requests
+from business_chatbot.src.business_chatbot.business_flow import BusinessChatbotFlow as Processor
 
-# Ignorer les avertissements de syntaxe non critiques
-warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
+from business_chatbot.src.business_chatbot.crew import BusinessChatbot
+from flask import Flask, jsonify, request, Response, stream_with_context
 
 
-def run_crew():
-    """
-    Permet à l'utilisateur de choisir un mode de test (consultation ou analyse de fichier)
-    et lance le crew avec les inputs correspondants.
-    """
-    print("🤖 Bienvenue dans l'outil de test de BusinessChatbot 🤖")
-    print("Veuillez choisir le mode d'exécution :")
-    print("1: Consultation Directe (basée sur une simple question)")
-    print("2: Analyse de Données (basée sur une question et un fichier CSV)")
+from  flask_cors import CORS
 
-    mode = input("Votre choix (1 ou 2) : ").strip()
+from business_chatbot.src.business_chatbot.tools.streaming_listener import flask_streaming_listener
 
-    if mode == '1':
-        print("\n=== Mode : Consultation Directe ===")
-        user_question = input("Entrez votre question business/marketing : ").strip()
-        if not user_question:
-            print("Erreur : aucune question fournie. Annulation.")
-            return
-        # Les inputs pour la tâche de consultation directe
-        inputs = {'demande': user_question}
+agents=BusinessChatbot()
+b2b_api_url = "http://15.236.152.46:8080/api/b2b/searchByAttrExact"  # @param {type:"string"}
+b2c_api_url = "http://15.236.152.46:8080/api/b2c/searchByAttrExact"
+# Proper variable assignment for payload
+payload = {
 
-    elif mode == '2':
-        print("\n=== Mode : Analyse de Données (CSV) ===")
-        user_question = input("Entrez votre question pour guider l'analyse : ").strip()
-        csv_path = input("Entrez le chemin vers votre fichier CSV : ").strip()
+}
 
-        if not user_question or not csv_path:
-            print("Erreur : question ou chemin de fichier manquant. Annulation.")
-            return
+headers = {
+    "Content-Type": "application/json",
+    "Accept": "*/*"
+}
+
+params = {'page': 10, 'size': 10, 'sortBy': '_score', 'direction': 'desc'}
+
+def make_post_request(url, payload, headers, params):
+    """Make POST request and handle response"""
+    try:
+        print(f"Making POST request to {url}...")
+        print(f"Payload: {json.dumps(payload, indent=2)}")
+
+        response = requests.post(url, json=payload, headers=headers, timeout=30, params=params)
+        response.raise_for_status()
+
+        print(f"Success! Status Code: {response.status_code}")
 
         try:
-            with open(csv_path, 'r', encoding='utf-8') as f:
-                csv_content = f.read()
-            print(f"Fichier CSV '{csv_path}' lu avec succès.")
+            return response.json()
+        except ValueError:
+            print("Response is not JSON, returning raw text")
+            return {"raw_response": response.text}
 
-            # Les inputs pour la tâche d'analyse de données.
-            # Le contenu du CSV est passé dans le contexte via le dictionnaire 'inputs'.
-            # La clé 'csv_data' est un exemple ; assurez-vous que votre 'crew'
-            # est configuré pour la transmettre correctement à la tâche.
-            inputs = {
-                'demande': user_question,
-                'csv_data': csv_content
-            }
+    except requests.exceptions.RequestException as e:
+        print(f"Error making request: {str(e)}")
+        return {"error": str(e), "type": type(e).__name__}
 
-        except FileNotFoundError:
-            print(f"\nErreur : Le fichier '{csv_path}' n'a pas été trouvé.")
-            return
+
+app= Flask(__name__)
+CORS(app)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+@app.route('/api/crew', methods=['POST'])
+def handle_Requests():
+    try:
+        data = request.get_json()
+        logger.info(data)
+
+        user_choice = data['choice']
+        user_input = data['input']
+        logger.info(f"Choice: {user_choice}, Input: {user_input}")
+
+        user_info = {'choice': user_choice, 'input': user_input}
+        processor = Processor()
+        crews_result = processor.kickoff(inputs=user_info)
+        logger.info(f"Crew result: {crews_result}")
+
+
+
+        if user_choice in ['b2c', 'b2b']:
+            return crews_result
+
+
+    except Exception as e:
+        logger.error(f"Erreur: {str(e)}")
+        return jsonify({"response": "Désolé, une erreur s'est produite."}), 500
+
+
+@app.route('/api/stream', methods=['POST'])
+def stream_response():
+    data = request.get_json()
+    user_input = data.get('input', '')
+
+    if not user_input.strip():
+        return jsonify({'error': 'Input is required'}), 400
+
+    client_id = str(uuid.uuid4())
+
+    @stream_with_context
+    def generate():
+        try:
+            # Enregistrer le client pour le streaming
+            flask_streaming_listener.register_client(client_id)
+
+            # Envoyer le message de démarrage
+            yield f"data: {json.dumps({'type': 'start', 'message': 'Initialisation de l IA...', 'client_id': client_id})}\n\n"
+
+            # Créer et exécuter le processor dans un thread séparé
+
+            def run_processor():
+                try:
+                    user_info = {'choice': 'default', 'input': user_input}
+                    processor = Processor()
+
+                    # Exécuter le flow (le streaming se fait via les event listeners)
+                    result = processor.kickoff(inputs=user_info)
+                    processor.plot("my_flow_plot")
+
+                    # Envoyer le résultat final
+                    final_data = {
+                        'type': 'final_result',
+                        'content': str(result.raw) if hasattr(result, 'raw') else str(result),
+                        'timestamp': time.time()
+                    }
+
+                    if client_id in flask_streaming_listener.client_queues:
+                        flask_streaming_listener.client_queues[client_id].put(final_data)
+
+                except Exception as e:
+                    logger.error(f"Error in processor thread: {str(e)}")
+                    error_data = {
+                        'type': 'error',
+                        'message': f'Erreur lors du traitement: {str(e)}',
+                        'timestamp': time.time()
+                    }
+
+                    try:
+                        if client_id in flask_streaming_listener.client_queues:
+                            flask_streaming_listener.client_queues[client_id].put(error_data)
+                    except Exception as put_error:
+                        logger.error(f"Error putting error data to queue: {put_error}")
+
+            # Démarrer le processor en arrière-plan
+            processor_thread = threading.Thread(target=run_processor)
+            processor_thread.daemon = True
+            processor_thread.start()
+
+            # Streamer les événements depuis la queue
+            timeout_count = 0
+            max_timeout = 30  # 30 secondes de timeout total
+
+            while flask_streaming_listener.active_streams.get(client_id, False):
+                try:
+                    # Récupérer les données de la queue avec timeout
+                    event_data = flask_streaming_listener.client_queues[client_id].get(timeout=1)
+
+                    # Réinitialiser le compteur de timeout
+                    timeout_count = 0
+
+                    # Envoyer les données au client
+                    yield f"data: {json.dumps(event_data)}\n\n"
+
+                    # Vérifier si le streaming est terminé
+                    if event_data.get('type') in ['complete', 'final_result', 'error']:
+                        # Envoyer un message de fin
+                        end_data = {'type': 'end', 'timestamp': time.time()}
+                        yield f"data: {json.dumps(end_data)}\n\n"
+                        break
+
+                except queue.Empty:
+                    timeout_count += 1
+
+                    # Envoyer un heartbeat pour maintenir la connexion
+                    heartbeat_data = {
+                        'type': 'heartbeat',
+                        'timestamp': time.time(),
+                        'timeout_count': timeout_count
+                    }
+                    yield f"data: {json.dumps(heartbeat_data)}\n\n"
+
+                    # Timeout global
+                    if timeout_count >= max_timeout:
+                        timeout_data = {
+                            'type': 'timeout',
+                            'message': 'Délai d attente dépassé',
+                                                                 'timestamp': time.time()
+                        }
+                        yield f"data: {json.dumps(timeout_data)}\n\n"
+                        break
+
+                except Exception as e:
+                    logger.error(f"Error in streaming loop: {str(e)}")
+                    error_data = {
+                        'type': 'stream_error',
+                        'message': str(e),
+                        'timestamp': time.time()
+                    }
+                    yield f"data: {json.dumps(error_data)}\n\n"
+                    break
+
         except Exception as e:
-            print(f"\nUne erreur est survenue lors de la lecture du fichier : {e}")
-            return
+            logger.error(f"Error in stream generation: {str(e)}")
+            error_data = {
+                'type': 'generation_error',
+                'message': str(e),
+                'timestamp': time.time()
+            }
+            yield f"data: {json.dumps(error_data)}\n\n"
 
-    else:
-        print("Choix invalide. Veuillez redémarrer et choisir 1 ou 2.")
-        return
+        finally:
+            # Nettoyer les ressources du client
+            flask_streaming_listener.unregister_client(client_id)
+            logger.info(f"Streaming completed for client {client_id}")
 
-    # Initialisation et lancement du crew
+    return Response(
+        generate(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Cache-Control',
+            'X-Accel-Buffering': 'no'  # Pour nginx
+        }
+    )
+
+
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    return jsonify({
+        'status': 'healthy',
+        'active_streams': len(flask_streaming_listener.active_streams),
+        'timestamp': time.time()
+    })
+
+
+# Gestionnaire d'erreurs pour les routes streaming
+@app.errorhandler(Exception)
+def handle_streaming_error(error):
+    if request.path.startswith('/api/stream'):
+        logger.error(f"Streaming error: {str(error)}")
+
+        def error_stream():
+            error_data = {
+                'type': 'server_error',
+                'message': 'Erreur interne du serveur',
+                'timestamp': time.time()
+            }
+            yield f"data: {json.dumps(error_data)}\n\n"
+
+        return Response(error_stream(), mimetype='text/event-stream', status=500)
+
+    return jsonify({'error': 'Internal server error'}), 500
+
+
+app.route('/api/stream1', methods=['POST'])
+def handle_streaming_requests():
     try:
-        print("\n🚀 Lancement du crew...")
-        chatbot_crew = BusinessChatbot().crew()
-        result = chatbot_crew.kickoff(inputs=inputs)
+        data = request.get_json()
+        user_choice = data.get('choice')
+        user_input = data.get('input')
 
-        print("\n--- ✅ Réponse Finale de l'Agent ---")
-        print(result)
+        if user_choice != 'b2c':
+            return jsonify({"error": "This endpoint only supports B2C streaming requests"}), 400
+
+        def progress_generator():
+            user_info = {'choice': user_choice, 'input': user_input}
+            processor = Processor()
+
+            # Yield progress updates directly from processor
+            for update in processor.kickoff(inputs=user_info):
+                yield f"data: {json.dumps(update)}\n\n"
+
+        response = Response(
+            progress_generator(),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+                'Connection': 'keep-alive',
+                'X-Accel-Buffering': 'no',  # Nginx
+                'X-Sendfile-Type': '',  # Apache
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Cache-Control'
+            }
+        )
+
+        # Disable buffering at the response level
+        response.implicit_sequence_conversion = False
+        return response
 
     except Exception as e:
-        print(f"\nUne erreur critique est survenue pendant l'exécution du crew : {e}")
+        logger.error(f"Streaming error: {str(e)}")
+        return Response(
+            f"data: {json.dumps({'status': 'error', 'message': str(e)})}\n\n",
+            mimetype='text/event-stream'
+        )
 
+if __name__ == '__main__':
+    # Importer et initialiser l'event listener
+    print("Initializing streaming event listener...")
 
-def replay():
-    """
-    Relance l'exécution d'un crew à partir d'une tâche spécifique (pour le débogage).
-    """
-    if len(sys.argv) < 2:
-        print("Usage: python main.py replay <task_id>")
-        return
-
-    task_id = sys.argv[1]
-    print(f"=== Tentative de Replay pour la tâche : {task_id} ===")
-
-    try:
-        BusinessChatbot().crew().replay(task_id=task_id)
-    except Exception as e:
-        print(f"Erreur lors du replay : {e}")
-
-
-if __name__ == "__main__":
-    # Permet d'appeler la fonction de replay via la ligne de commande,
-    # ex: python main.py replay <ID_DE_LA_TACHE>
-    if len(sys.argv) > 1 and sys.argv[1].lower() == 'replay':
-        replay()
-    else:
-        run_crew()
+    app.run(debug=True, port=3002, threaded=True)
