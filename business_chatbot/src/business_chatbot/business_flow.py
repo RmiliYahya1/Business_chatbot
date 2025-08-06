@@ -68,6 +68,7 @@ class BusinessChatbotFlow(Flow[UserChoice]):
     @start()
     def button_choice(self):
         logger.info(f"Running flow with choice: {self.state.choice}, input: {self.state.input}")
+
         return self.state.choice
 
     @router(button_choice)
@@ -144,30 +145,22 @@ class BusinessChatbotFlow(Flow[UserChoice]):
 
             logger.info(f"Processed {len(records)} B2B records")
 
-            # 5. Create CSV for download
             df = pd.DataFrame(records)
             csv_data = df.to_csv(index=False, encoding='utf-8')
 
-            # 6. Create temporary file for RAG analysis
             with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as tmp:
                 tmp.write(csv_data)
                 csv_path = tmp.name
 
             logger.info(f"Created temporary CSV at: {csv_path}")
-
-            # 7. Create RAG tool for analysis
             rag = CSVSearchTool(
                 file_path=csv_path,
                 description="Tool to search through the provided B2B business data"
             )
-
-            # 8. ✅ SOLUTION CORRIGÉE : Utiliser expert_crew2 correctement
-            BusinessChatbot().set_rag_tool(rag)  # Set the RAG tool
+            BusinessChatbot().set_rag_tool(rag)
             inputs_dict.update({'dataset_info': f"Dataset loaded with {len(df)} B2B records. Use the search tool to analyze a random sample of  data."})
-
             logger.info("Calling expert_crew2 for analysis...")
-            # ✅ Appel correct de expert_crew2 (paramètre positionnel)
-            response = BusinessChatbot().expert_crew2().kickoff(inputs=inputs_dict)
+            response = BusinessChatbot().data_analysis_synthesis().kickoff(inputs=inputs_dict)
 
             logger.info("Analysis completed successfully")
 
@@ -255,7 +248,7 @@ class BusinessChatbotFlow(Flow[UserChoice]):
 
             logger.info("Calling expert_crew2 for analysis...")
             # ✅ Appel correct de expert_crew2 (paramètre positionnel)
-            response = BusinessChatbot().expert_crew2().kickoff(inputs=inputs_dict)
+            response = BusinessChatbot().data_analysis_synthesis().kickoff(inputs=inputs_dict)
             return jsonify({
                 "response": str(response),
                 "csv": csv_data

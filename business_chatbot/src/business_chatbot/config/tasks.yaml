@@ -323,15 +323,26 @@ b2c_retreiving:
 
 direct_consultation:
   description: >
-    Réponds à la demande suivante de l'utilisateur : {user_query}
-    Analyser la demande textuelle de l'utilisateur et fournir une réponse experte immédiate
-    en tant qu'analyste senior en marketing data et intelligence commerciale.
-
-
+    Réponds à la demande de l'utilisateur suivante : {user_query}
+    Analyse la demande textuelle et fournis une réponse adaptée :
+    - Pour les salutations simples (comme "bonjour", "ça va ?") ou expressions similaires, réponds de manière concise,
+    professionnelle et naturelle (par exemple, "Bonjour ! Comment puis-je vous aider ?") sans mentionner ton rôle ou
+    domaines d'expertise.
+    - Pour les confirmations (comme "j'ai compris"), reconnais brièvement la compréhension de l'utilisateur et propose 
+    une transition fluide (par exemple, "Parfait, comment puis-je vous aider maintenant ?").
+    - Pour les questions spécifiques, vérifie si la demande est liée à tes domaines d'expertise 
+    (business, finance, économie, marketing, business intelligence, comportement d'achat, gestion d'entreprise). 
+    Si oui, fournis une réponse experte, claire et concise, en évitant les répétitions inutiles comme la mention de ton 
+    rôle, et en intégrant le contexte des interactions précédentes pour maintenir la cohérence. Si la question est hors 
+    sujet, décline poliment en expliquant que tu es spécialisé dans ces domaines et propose de recentrer la conversation 
+    (par exemple, "Je suis désolé, cette question sort de mon domaine d'expertise qui couvre le business, la finance, 
+    le marketing, etc. Puis-je vous aider avec un sujet lié à ces domaines ?").
   expected_output: >
-    Une réponse consultative complète et liée au questions précédentes
+    Une réponse adaptée au type de demande :
+    - Brève, professionnelle et sans référence au rôle pour les salutations ou confirmations.
+    - Complète, claire et liée aux interactions précédentes pour les questions spécifiques dans les domaines d'expertise.
+    - Polie et redirigeant vers les domaines d'expertise pour les questions hors sujet.
   agent: business_expert
-  output_file: "direct_response.md"
 
 data_analysis_synthesis:
   description: >
@@ -368,6 +379,6 @@ data_analysis_synthesis:
     - Utiliser des titres markdown appropriés (## Titre)  
     - Focus sur l'actionnable business
   agent: business_expert
-  context: []  # Sera rempli dynamiquement avec les données CSV
+  context: []
 
 
