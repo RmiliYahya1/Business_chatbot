@@ -112,7 +112,6 @@ def stream_response():
 
                     # Exécuter le flow (le streaming se fait via les event listeners)
                     result = processor.kickoff(inputs=user_info)
-                    processor.plot("my_flow_plot")
 
                     # Envoyer le résultat final
                     final_data = {
