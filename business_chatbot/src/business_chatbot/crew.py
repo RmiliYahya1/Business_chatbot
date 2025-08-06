@@ -1,28 +1,47 @@
 from crewai import Agent, Crew, Process, Task, LLM
-from crewai.agents.agent_builder.base_agent import BaseAgent
 from crewai.project import CrewBase, agent, crew, task
 import os, queue
 from dotenv import load_dotenv
-from crewai.memory import LongTermMemory, ShortTermMemory
-from uuid import uuid4
-from crewai.memory.storage.ltm_sqlite_storage import LTMSQLiteStorage
-
-
 from business_chatbot.src.business_chatbot.tools.custom_tool import CSVFileCreatorTool
+from crewai.utilities.paths import db_storage_path
 
 load_dotenv()
 MODEL = os.getenv('MODEL')
 token_queue = queue.Queue()
 csv_tool = CSVFileCreatorTool()
-
-
-
 my_llm = LLM(
     model=f"openai/{MODEL}",
     api_key=os.getenv("OPENAI_API_KEY"),
     stream=True,
     temperature=0.7,
 )
+
+#storage path
+def log_storage_path():
+    storage_path = db_storage_path()
+
+    print(f"Storage path: {storage_path}")
+    print(f"Path exists: {os.path.exists(storage_path)}")
+    print(f"Is writable: {os.access(storage_path, os.W_OK) if os.path.exists(storage_path) else 'Path does not exist'}")
+
+    if os.path.exists(storage_path):
+        print("\nStored files and directories:")
+        try:
+            for item in os.listdir(storage_path):
+                item_path = os.path.join(storage_path, item)
+                if os.path.isdir(item_path):
+                    print(f"📁 {item}/")
+                    for subitem in os.listdir(item_path):
+                        print(f"   └── {subitem}")
+                else:
+                    print(f"📄 {item}")
+        except PermissionError:
+            print(f"Permission refusée pour accéder à {storage_path}")
+        except Exception as e:
+            print(f"Une erreur est survenue : {e}")
+    else:
+        print("No CrewAI storage directory found yet.")
+
 
 @CrewBase
 class BusinessChatbot:
@@ -51,7 +70,6 @@ class BusinessChatbot:
             config=self.agents_config['business_expert'],
             llm=my_llm,
             allow_delegation=False,
-            memory=True,
             verbose=True,
             tools=tools,
             respect_context_window=False,
@@ -113,19 +131,13 @@ class BusinessChatbot:
 
     @crew
     def consultation_direct(self) -> Crew:
-        """Crew pour consultation directe"""
+        log_storage_path()
         return Crew(
             agents=[self.business_expert()],
             tasks=[self.direct_consultation_task()],
             process=Process.sequential,
             verbose=True,
             memory=True,
-            long_term_memory=LongTermMemory(
-                storage=LTMSQLiteStorage(
-                    db_path=f"./my_project_storage"
-                )
-            ),
-            short_term_memory=ShortTermMemory(),
             output_json=True,
         )
 
@@ -148,8 +160,7 @@ class BusinessChatbot:
             tasks=[self.b2c_retreiving()],
             process=Process.sequential,
             verbose=True,
-            output_json=True,
-            stream=True
+            output_json=True
         )
 
     @crew
@@ -160,8 +171,7 @@ class BusinessChatbot:
             tasks=[self.b2b_retreiving()],
             process=Process.sequential,
             verbose=True,
-            output_json=True,
-            stream=True
+            output_json=True
         )
 
 
