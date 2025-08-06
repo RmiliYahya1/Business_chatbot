@@ -130,7 +130,7 @@ class BusinessChatbot:
         )
 
     @crew
-    def expert_crew2(self) -> Crew:
+    def data_analysis_synthesis(self) -> Crew:
 
         return Crew(
             agents=[self.business_expert()],

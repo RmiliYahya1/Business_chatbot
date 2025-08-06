@@ -247,7 +247,7 @@ class BusinessChatbotFlow(Flow[UserChoice]):
             inputs_dict.update({'dataset_info': f"Dataset loaded with {len(df)} B2C records. Use the search tool to analyze a random sample of data."})
 
             logger.info("Calling expert_crew2 for analysis...")
-            # ✅ Appel correct de expert_crew2 (paramètre positionnel)
+            # ✅ Appel correct de data_analysis_synthesis (paramètre positionnel)
             response = BusinessChatbot().data_analysis_synthesis().kickoff(inputs=inputs_dict)
             return jsonify({
                 "response": str(response),
