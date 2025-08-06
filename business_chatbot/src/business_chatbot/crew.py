@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 from crewai.memory import LongTermMemory, ShortTermMemory
 from uuid import uuid4
 from crewai.memory.storage.ltm_sqlite_storage import LTMSQLiteStorage
+
+
 from business_chatbot.src.business_chatbot.tools.custom_tool import CSVFileCreatorTool
 
 load_dotenv()
@@ -146,7 +148,8 @@ class BusinessChatbot:
             tasks=[self.b2c_retreiving()],
             process=Process.sequential,
             verbose=True,
-            output_json=True
+            output_json=True,
+            stream=True
         )
 
     @crew
@@ -157,7 +160,8 @@ class BusinessChatbot:
             tasks=[self.b2b_retreiving()],
             process=Process.sequential,
             verbose=True,
-            output_json=True
+            output_json=True,
+            stream=True
         )
 
 
