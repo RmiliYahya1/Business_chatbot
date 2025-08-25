@@ -337,10 +337,7 @@ data_analysis_synthesis:
   description: >
     Interpréter et synthétiser un échantillon de données CSV B2B ou B2C générées par les agents spécialisés,
     puis créer une réponse enrichie pour l'utilisateur final.
-    Les données ou vous allez prendre un échantillon sont fournies dans le contexte : {dataset_info}.
-    
-    Cette tâche est activée quand un bouton (B2B ou B2C) est sélectionné et que des données
-    structurées sont disponibles via le contexte de la tâche.
+    Les données ou vous allez prendre un échantillon de : {dataset_info}.
     
     Processus à suivre :
     1. Analyser l'input utilisateur original pour comprendre son besoin  : {user_query}
@@ -372,4 +369,5 @@ data_analysis_synthesis:
   agent: business_expert
   context: []  # Sera rempli dynamiquement avec les données CSV
   output_file: "analysis_response.md"
+  guardrail: Utiliser juste les colonnes du fichier csv
 

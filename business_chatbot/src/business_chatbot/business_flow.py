@@ -96,16 +96,16 @@ class BusinessChatbotFlow(Flow[UserChoice]):
         def generate_response():
             try:
                 logger.info("Starting B2B consultation...")
-                yield f"data: {json.dumps({'status': 'starting', 'message': 'Initializing B2B extraction process...', 'progress': 10})}\n\n"
+                yield f"data: {json.dumps({'status': 'starting', 'message': 'Initialisation du processus d\'extraction B2B...', 'progress': 10})}\n\n"
 
                 # 1. Generate query with B2B crew
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'Generating query with B2B crew...', 'progress': 20})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Génération de requête', 'progress': 20})}\n\n"
                 query = self.business_chatbot.b2b_crew().kickoff(inputs=inputs_dict)
                 logger.info(f"B2B Query result: {query}")
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'B2B crew query generated successfully', 'progress': 30})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Requête générée avec succès', 'progress': 30})}\n\n"
 
                 # 2. Handle CrewOutput conversion
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'Processing output...', 'progress': 35})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Traitement de la sortie...', 'progress': 35})}\n\n"
                 if hasattr(query, 'raw_output'):
                     query_dict = query.raw_output
                 elif hasattr(query, 'result'):
@@ -118,9 +118,9 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                         return
 
                 # 3. Make API request
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'Making API request to fetch data...', 'progress': 40})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Envoyer la requête API pour récupérer des données...', 'progress': 40})}\n\n"
                 result = make_post_request(b2b_api_url, query_dict, headers, params)
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'API request completed', 'progress': 50})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'API request accompli', 'progress': 50})}\n\n"
 
                 if isinstance(result, str):
                     try:
@@ -134,7 +134,7 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                     "placeId", "name", "description", "isSpendingOnAds", "reviews", "rating",
                     "website", "mockEmail", "phone", "canClaim", "ownerId", "ownerName",
                     "ownerLink", "featuredImage", "mainCategory", "categories", "workdayTiming",
-                    "isTemporarilyClosed", "isPermanentlyClosed", "closedOn", "address",
+                    "isTemporarilyClosed", "isPermanentlyClosed","address","closedOn",
                     "link", "status", "priceRange", "featuredQuestion", "reviewsLink",
                     "latitude", "longitude", "plusCode", "ward", "street", "city",
                     "postalCode", "state", "countryCode", "timeZone", "cid", "dataId",
@@ -150,7 +150,7 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                     records = result['page']['content']
 
                 if not records:
-                    yield f"data: {json.dumps({'status': 'error', 'message': 'No records found in API response', 'progress': 60})}\n\n"
+                    yield f"data: {json.dumps({'status': 'error', 'message': 'Aucun enregistrement trouvé dans la réponse de l\'API', 'progress': 60})}\n\n"
                     return
 
                 records = [record for record in records if isinstance(record, dict)]
@@ -162,13 +162,13 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                 yield f"data: {json.dumps({'status': 'processing', 'message': f'Found {len(records)} valid records', 'progress': 65})}\n\n"
 
                 # 5. Create CSV
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'Creating CSV from processed data...', 'progress': 70})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Création d\'un fichier CSV à partir de données traitées...', 'progress': 70})}\n\n"
                 df = pd.DataFrame(records)
                 # Filter for columns that actually exist in the DataFrame
                 available_columns = [col for col in desired_fields if col in df.columns]
                 df1 = df[available_columns]
                 csv_data = df1.to_csv(index=False, encoding='utf-8')
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'CSV generated successfully', 'progress': 75})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'CSV généré avec succès', 'progress': 75})}\n\n"
 
                 # 6. Create RAG analysis
                 with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as tmp:
@@ -176,7 +176,7 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                     csv_path = tmp.name
                     logger.info(f"Created temporary CSV at: {csv_path}")
 
-                    yield f"data: {json.dumps({'status': 'processing', 'message': 'Setting up RAG analysis tool...', 'progress': 80})}\n\n"
+                    yield f"data: {json.dumps({'status': 'processing', 'message': 'Configuration de l\'outil d\'analyse RAG...', 'progress': 80})}\n\n"
                     rag = CSVSearchTool(
                         file_path=csv_path,
                         description="Tool to search through the provided B2B business data"
@@ -187,10 +187,10 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                         'dataset_info': f"Dataset loaded with {len(df)} B2B records. Use the search tool to analyze a random sample of data."
                     })
 
-                    yield f"data: {json.dumps({'status': 'processing', 'message': 'Starting expert analysis of the data...', 'progress': 85})}\n\n"
+                    yield f"data: {json.dumps({'status': 'processing', 'message': 'Début de l\'analyse des données...', 'progress': 85})}\n\n"
                     logger.info("Calling expert_crew2 for analysis...")
                     response = BusinessChatbot().expert_crew2().kickoff(inputs=inputs_dict)
-                    yield f"data: {json.dumps({'status': 'processing', 'message': 'Expert analysis completed', 'progress': 95})}\n\n"
+                    yield f"data: {json.dumps({'status': 'processing', 'message': 'Analyse terminée', 'progress': 95})}\n\n"
 
                     # Final result
                     final_result = {
@@ -200,7 +200,7 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                         "headers": df.columns.tolist()
                     }
                     yield f"data: {json.dumps(final_result)}\n\n"
-                    yield f"data: {json.dumps({'status': 'completed', 'message': 'B2B extraction and analysis completed successfully', 'progress': 100})}\n\n"
+                    yield f"data: {json.dumps({'status': 'completed', 'message': 'Extraction et analyse B2B terminées avec succès', 'progress': 100})}\n\n"
 
             except Exception as e:
                 logger.error(f"B2B extraction error: {str(e)}")
@@ -224,15 +224,15 @@ class BusinessChatbotFlow(Flow[UserChoice]):
         def generate_response():
             try:
                 logger.info("Starting B2C extraction...")
-                yield f"data: {json.dumps({'status': 'starting', 'message': 'Initializing B2C extraction process...', 'progress': 10})}\n\n"
+                yield f"data: {json.dumps({'status': 'starting', 'message': 'Initialisation du processus d\'extraction B2C...', 'progress': 10})}\n\n"
                 time.sleep(0.5)
                 # 1. Générer la requête avec le crew B2C
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'Generating query with B2C crew...', 'progress': 20})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Génération de requête...', 'progress': 20})}\n\n"
                 query = self.business_chatbot.b2c_crew().kickoff(inputs=inputs_dict)
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'B2C crew query generated successfully', 'progress': 30})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Requête générée avec succès', 'progress': 30})}\n\n"
 
                 # 2. Handle CrewOutput conversion
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'Processing output...', 'progress': 35})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Traitement de la sortie...', 'progress': 35})}\n\n"
                 if hasattr(query, 'raw_output'):
                     query_dict = query.raw_output
                 elif hasattr(query, 'result'):
@@ -245,9 +245,9 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                         return
 
                 # 3. Make API request
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'Making API request to fetch data...', 'progress': 40})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Envoyer la requête API pour récupérer des données...', 'progress': 40})}\n\n"
                 result = make_post_request(b2c_api_url, query_dict, headers, params)
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'API request completed', 'progress': 50})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'API request accompli', 'progress': 50})}\n\n"
 
                 if isinstance(result, str):
                     try:
@@ -271,7 +271,7 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                     records = result['page']['content']
 
                 if not records:
-                    yield f"data: {json.dumps({'status': 'error', 'message': 'No records found in API response', 'progress': 60})}\n\n"
+                    yield f"data: {json.dumps({'status': 'error', 'message': 'Aucun enregistrement trouvé dans la réponse de l\'API', 'progress': 60})}\n\n"
                     return
 
                 records = [
@@ -285,13 +285,13 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                 yield f"data: {json.dumps({'status': 'processing', 'message': f'Found {len(records)} valid records', 'progress': 65})}\n\n"
 
                 # 5. Create CSV
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'Creating CSV from processed data...', 'progress': 70})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Création d\'un fichier CSV à partir de données traitées...', 'progress': 70})}\n\n"
                 df = pd.DataFrame(records)
                 csv_data = df.to_csv(index=False, encoding='utf-8')
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'CSV generated successfully', 'progress': 75})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'CSV généré avec succès', 'progress': 75})}\n\n"
 
                 # 6. Create RAG analysis
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'Setting up RAG analysis tool...', 'progress': 80})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Configuration de l\'outil d\'analyse RAG...', 'progress': 80})}\n\n"
                 with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as tmp:
                     tmp.write(csv_data)
                     csv_path = tmp.name
@@ -305,13 +305,13 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                 inputs_dict.update({
                                        'dataset_info': f"Dataset loaded with {len(df)} B2C records. Use the search tool to analyze a random sample of data."})
 
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'Starting expert analysis of the data...', 'progress': 85})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Début de l\'analyse des données...', 'progress': 85})}\n\n"
                 logger.info("Calling expert_crew2 for analysis...")
                 # ✅ Appel correct de expert_crew2 (paramètre positionnel)
                 response = BusinessChatbot().expert_crew2().kickoff(inputs=inputs_dict)
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'Expert analysis completed', 'progress': 95})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Analyse terminée', 'progress': 95})}\n\n"
 
-                yield f"data: {json.dumps({'status': 'completed', 'message': 'B2C extraction and analysis completed successfully', 'progress': 100})}\n\n"
+                yield f"data: {json.dumps({'status': 'completed', 'message': 'Extraction et analyse B2B terminées avec succès', 'progress': 100})}\n\n"
 
                 # Send final result
                 final_result = {
