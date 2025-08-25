@@ -30,28 +30,6 @@ headers = {
 
 params = {'page': 10, 'size': 10, 'sortBy': '_score', 'direction': 'desc'}
 
-def make_post_request(url, payload, headers, params):
-    """Make POST request and handle response"""
-    try:
-        print(f"Making POST request to {url}...")
-        print(f"Payload: {json.dumps(payload, indent=2)}")
-
-        response = requests.post(url, json=payload, headers=headers, timeout=30, params=params)
-        response.raise_for_status()
-
-        print(f"Success! Status Code: {response.status_code}")
-
-        try:
-            return response.json()
-        except ValueError:
-            print("Response is not JSON, returning raw text")
-            return {"raw_response": response.text}
-
-    except requests.exceptions.RequestException as e:
-        print(f"Error making request: {str(e)}")
-        return {"error": str(e), "type": type(e).__name__}
-
-
 app= Flask(__name__)
 CORS(app)
 logging.basicConfig(level=logging.INFO)
@@ -66,9 +44,12 @@ def handle_Requests():
 
         user_choice = data['choice']
         user_input = data['input']
+        user_id = data.get('userId', 'anonymous')
+        conversation_id = data.get('conversationId', str(uuid.uuid4()))
+        search_enabled = data.get('searchEnabled', False)
         logger.info(f"Choice: {user_choice}, Input: {user_input}")
 
-        user_info = {'choice': user_choice, 'input': user_input}
+        user_info = {'choice': user_choice, 'input': user_input,'user_id': user_id, 'conversation_id': conversation_id,'search_enabled': bool(search_enabled),}
         processor = Processor()
         crews_result = processor.kickoff(inputs=user_info)
         logger.info(f"Crew result: {crews_result}")
@@ -94,11 +75,14 @@ def handle_Requests():
 def stream_response():
     data = request.get_json()
     user_input = data.get('input', '')
+    user_id = data.get('userId', 'anonymous')
+    conversation_id = data.get('conversationId')  # facultatif côté front
+    search_enabled = data.get('searchEnabled', False)
+    client_id = conversation_id or str(uuid.uuid4())  # run_id stable si fourni
 
     if not user_input.strip():
         return jsonify({'error': 'Input is required'}), 400
 
-    client_id = str(uuid.uuid4())
 
     @stream_with_context
     def generate():
@@ -113,7 +97,7 @@ def stream_response():
 
             def run_processor():
                 try:
-                    user_info = {'choice': 'default', 'input': user_input}
+                    user_info = {'choice': 'default', 'input': user_input, 'user_id': user_id, 'conversation_id': client_id,'search_enabled': bool(search_enabled),}
                     processor = Processor()
 
                     # Exécuter le flow (le streaming se fait via les event listeners)
@@ -259,5 +243,4 @@ def handle_streaming_error(error):
 if __name__ == '__main__':
     # Importer et initialiser l'event listener
     print("Initializing streaming event listener...")
-
-    app.run(debug=True, port=3002, threaded=True)
+    app.run(debug=True, port=3002, threaded=True, use_reloader=False)
