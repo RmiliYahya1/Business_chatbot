@@ -144,7 +144,7 @@ b2b_retreiving:
       "":""
       }
   agent: b2b_specialist
-  output_file: None
+
 
 b2c_retreiving:
   description: >
@@ -318,33 +318,55 @@ b2c_retreiving:
     "":""
     }
   agent: b2c_specialist
-  output_file: None
 
 
 direct_consultation:
   description: >
-    Réponds à la demande suivante de l'utilisateur : {user_query}
-    Analyser la demande textuelle de l'utilisateur et fournir une réponse experte immédiate
-    en tant qu'analyste senior en marketing data et intelligence commerciale.
+    [POLICY]
+    - Domaine autorisé: business, finance, économie, marketing, BI, comportement d'achat, gestion d'entreprise.
+    - Hors périmètre: cuisine/recettes, programmation, santé, juridique, divertissement, sport, etc.
+    - Si hors périmètre → appliquer strictement le "Modèle de refus" ci-dessous.
+    - N'expose pas la bio utilisateur ou des détails mémorisés, sauf si on le demande explicitement.
+    - N'écris jamais "Tu es [prénom], [âge]..." dans un refus.
+    - N'écho pas de réponse précédente; crée une réponse nouvelle.
 
+    [MODELES]
+    - Refus hors périmètre (obligatoire) :
+      "Désolé, ce sujet sort de mon périmètre (business/finance/marketing/BI).
+       Je peux vous aider sur : [3 sujets alignés]."
+
+    [ENTRÉE UTILISATEUR]
+    {user_query}
+
+    [INSTRUCTIONS DE RÉPONSE]
+    - Si salutation/confirmation simple → réponse brève (≤ 20 mots).
+    - Si question on-topic → réponse claire en 3–6 puces + 1 action concrète.
+    - Si l'utilisateur vous remercie ou confirme sa satisfaction de la réponse -> réponse chaleureuse courte + propose de l'aide encore
+    - Si hors périmètre → utiliser exactement le modèle de refus.
+    - N’insère pas le texte du MEMORY CONTEXT tel quel; utilise-le seulement pour personnaliser.
 
   expected_output: >
-    Une réponse consultative complète et liée au questions précédentes
+    - Salutation/confirmation: courte, naturelle.
+    - On-topic: 3–6 puces, actionable, cohérente avec l’historique sans divulgation inutile.
+    - Off-topic: refus bref + 3 pistes on-topic.
+
   agent: business_expert
-  output_file: "direct_response.md"
+
 
 data_analysis_synthesis:
   description: >
     Interpréter et synthétiser un échantillon de données CSV B2B ou B2C générées par les agents spécialisés,
     puis créer une réponse enrichie pour l'utilisateur final.
-    Les données ou vous allez prendre un échantillon de : {dataset_info}.
+    Les données ou vous allez prendre un échantillon sont fournies dans le contexte : {dataset_info}.
+    
+    Cette tâche est activée quand un bouton (B2B ou B2C) est sélectionné et que des données
+    structurées sont disponibles via le contexte de la tâche.
     
     Processus à suivre :
     1. Analyser l'input utilisateur original pour comprendre son besoin  : {user_query}
     2. Examiner un échantillon de données aléatoirement CSV fournies : {dataset_info}
     3. Extraire les insights clés et tendances significatives
     5. Corréler les données avec la demande utilisateur initiale
-    6. Synthétiser les findings en recommandations business
 
     
     Priorité à l'interprétation métier des données techniques.
@@ -356,7 +378,6 @@ data_analysis_synthesis:
     - Une section de contextualisation de l'analyse
     - Une section de synthèse des insights clés extraits des données
     - Une section d'interprétation business des tendances identifiées
-    - Une section de recommandations stratégiques basées sur les données
   
     L'agent doit choisir des titres de sections (## Titre) qui reflètent naturellement 
     les insights découverts et le type d'analyse B2B/B2C effectuée.

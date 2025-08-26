@@ -1,5 +1,6 @@
 import json
 import tempfile
+import uuid
 import warnings
 import pandas as pd
 from crewai.flow.flow import Flow, start, router, listen
@@ -8,7 +9,7 @@ from crewai_tools.tools.csv_search_tool.csv_search_tool import CSVSearchTool
 from flask import jsonify
 import requests
 from pydantic import BaseModel
-from business_chatbot.src.business_chatbot.crew import BusinessChatbot
+from business_chatbot.src.business_chatbot.crew import BusinessChatbot, get_mem_service, SERPER_API_KEY
 from flask import Response
 import time
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
@@ -52,12 +53,14 @@ logger = logging.getLogger(__name__)
 class UserChoice(BaseModel):
     choice: str = ""
     input: str = ""
+    search_enabled: bool = False
 
 
 class BusinessChatbotFlow(Flow[UserChoice]):
     def __init__(self):
         super().__init__()
         self.business_chatbot = BusinessChatbot()
+        self.mem_service = get_mem_service()
 
     def kickoff(self, inputs=None):
         if inputs:
@@ -83,15 +86,95 @@ class BusinessChatbotFlow(Flow[UserChoice]):
     @listen('default')
     def consultation_direct(self):
         user_query = self.state.input
-        logger.info(f"Executing consultation_direct with query: {user_query}")
-        crew_result = self.business_chatbot.consultation_direct().kickoff(inputs={'user_query': user_query})
-        logger.info(f"Crew result: {crew_result}")
-        return crew_result
+        user_id = getattr(self.state, "user_id", "anonymous")  # à passer depuis le front
+        run_id = getattr(self.state, "conversation_id", "session-" + str(uuid.uuid4()))  # idem
+        crew_name = "consultation_direct"
+        agent_name = "business_expert"
+
+
+        use_search = bool(getattr(self.state, "search_enabled", False))
+
+
+        logger.info(f" Consultation directe démarrée:")
+        logger.info(f"   - User query: {user_query[:50]}...")
+        logger.info(f"   - Search enabled: {use_search}")
+        logger.info(f"   - User ID: {user_id}")
+
+
+        self.business_chatbot.set_search_enabled(use_search)
+
+        debug_info = self.business_chatbot.debug_configuration()
+        logger.info(f"   - Debug config: {debug_info}")
+
+        u_id, a_id, r_id = get_mem_service().build_ids(user_id, crew_name, agent_name, run_id)
+        mems = get_mem_service().funnel_search(query=user_query, user_id=u_id, agent_id=a_id, run_id=r_id)
+        memory_ctx = get_mem_service().to_prompt(mems)
+
+        POLICY_BLOCK = """
+        [POLICY]
+        - Domaine autorisé: business, finance, économie, marketing, BI, comportement d'achat, gestion d'entreprise.
+        - Hors périmètre: cuisine/recettes, programmation, santé, juridique, divertissement, sport.
+        - Si hors périmètre → appliquer strictement le "Modèle de refus".
+        - N'écho pas une réponse précédente; reformule toujours.
+
+        [MODELES]
+        - Refus:
+          "Désolé, ce sujet sort de mon périmètre (business/finance/marketing/BI).
+           Je peux vous aider sur : [3 sujets alignés]."
+        """.strip()
+
+        search_instruction = ""
+        if use_search:
+            search_instruction = "\n[INSTRUCTION RECHERCHE]\nUtilise l'outil de recherche web (SerperDevTool) pour obtenir des informations récentes et pertinentes avant de répondre.\n"
+
+        enhanced_query = f"""{POLICY_BLOCK}
+        {search_instruction}
+        [MEMORY CONTEXT]  # à utiliser comme contexte, ne pas citer tel quel
+        {memory_ctx}
+
+        [USER]
+        {user_query}
+        """.strip()
+
+        logger.info(f" Exécution du crew avec recherche: {use_search}")
+
+        try:
+            crew_result = self.business_chatbot.consultation_direct().kickoff(
+                inputs={'user_query': enhanced_query}
+            )
+
+            logger.info(f"✅ Crew result obtenu: {type(crew_result)}")
+
+            assistant_msg = str(getattr(crew_result, "raw_output", getattr(crew_result, "result", crew_result)))
+
+
+            get_mem_service().add_interaction(
+                u_id, a_id, r_id, user_query, assistant_msg,
+                metadata={
+                    "segment": "default",
+                    "source": "direct_consultation",
+                    "search_enabled": use_search
+                }
+            )
+
+            return crew_result
+
+        except Exception as e:
+            logger.error(f" Erreur dans consultation_direct: {str(e)}")
+            logger.error(f"   - Search enabled: {use_search}")
+            logger.error(f"   - SERPER_API_KEY present: {bool(SERPER_API_KEY)}")
+            raise
 
     @listen('b2b')
     def b2b_consultation(self):
+        self.business_chatbot.set_search_enabled(False)
         user_query = self.state.input
         inputs_dict = {'user_query': user_query}
+        user_id = getattr(self.state, "user_id", "anonymous")
+        run_id = getattr(self.state, "conversation_id", "session-" + str(uuid.uuid4()))
+        crew_name = "data_analysis_synthesis"
+        agent_name = "business_expert"
+        u_id, a_id, r_id = get_mem_service().build_ids(user_id, crew_name, agent_name, run_id)
 
         def generate_response():
             try:
@@ -99,8 +182,8 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                 yield f"data: {json.dumps({'status': 'starting', 'message': 'Initialisation du processus d\'extraction B2B...', 'progress': 10})}\n\n"
 
                 # 1. Generate query with B2B crew
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'Génération de requête', 'progress': 20})}\n\n"
                 query = self.business_chatbot.b2b_crew().kickoff(inputs=inputs_dict)
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Génération de requête...', 'progress': 20})}\n\n"
                 logger.info(f"B2B Query result: {query}")
                 yield f"data: {json.dumps({'status': 'processing', 'message': 'Requête générée avec succès', 'progress': 30})}\n\n"
 
@@ -114,19 +197,17 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                     try:
                         query_dict = json.loads(str(query))
                     except json.JSONDecodeError:
-                        yield f"data: {json.dumps({'status': 'error', 'message': 'Failed to parse CrewAI output', 'progress': 35})}\n\n"
                         return
 
                 # 3. Make API request
                 yield f"data: {json.dumps({'status': 'processing', 'message': 'Envoyer la requête API pour récupérer des données...', 'progress': 40})}\n\n"
                 result = make_post_request(b2b_api_url, query_dict, headers, params)
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'API request accompli', 'progress': 50})}\n\n"
-
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Requête API accompli', 'progress': 50})}\n\n"
                 if isinstance(result, str):
                     try:
                         result = json.loads(result)
                     except json.JSONDecodeError:
-                        yield f"data: {json.dumps({'status': 'error', 'message': 'Invalid API response format', 'progress': 50})}\n\n"
+                        yield f"data: {json.dumps({'status': 'error', 'message': 'Format de réponse API invalide', 'progress': 50})}\n\n"
                         return
 
                 # 4. Process data
@@ -199,6 +280,14 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                         "csv": csv_data,
                         "headers": df.columns.tolist()
                     }
+                    assistant_text = str(response)
+                    user_text = self.state.input
+                    meta = {
+                        "segment": "b2b",
+                        "dataset_rows": len(df),
+                        "source": "csv_rag"
+                    }
+                    get_mem_service().add_interaction(u_id, a_id, r_id, user_text, assistant_text, metadata=meta)
                     yield f"data: {json.dumps(final_result)}\n\n"
                     yield f"data: {json.dumps({'status': 'completed', 'message': 'Extraction et analyse B2B terminées avec succès', 'progress': 100})}\n\n"
 
@@ -218,8 +307,14 @@ class BusinessChatbotFlow(Flow[UserChoice]):
 
     @listen('b2c')
     def b2c_extraction(self):
+        self.business_chatbot.set_search_enabled(False)
         user_query = self.state.input
         inputs_dict = {'user_query': user_query}
+        user_id = getattr(self.state, "user_id", "anonymous")
+        run_id = getattr(self.state, "conversation_id", "session-" + str(uuid.uuid4()))
+        crew_name = "data_analysis_synthesis"
+        agent_name = "business_expert"
+        u_id, a_id, r_id = get_mem_service().build_ids(user_id, crew_name, agent_name, run_id)
 
         def generate_response():
             try:
@@ -241,23 +336,22 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                     try:
                         query_dict = json.loads(str(query))
                     except json.JSONDecodeError:
-                        yield f"data: {json.dumps({'status': 'error', 'message': 'Failed to parse CrewAI output', 'progress': 35})}\n\n"
+                        yield f"data: {json.dumps({'status': 'error', 'message': '', 'progress': 35})}\n\n"
                         return
 
                 # 3. Make API request
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'Envoyer la requête API pour récupérer des données...', 'progress': 40})}\n\n"
                 result = make_post_request(b2c_api_url, query_dict, headers, params)
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'API request accompli', 'progress': 50})}\n\n"
-
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Envoie la requête API pour récupérer des données...', 'progress': 40})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Requête API accompli', 'progress': 50})}\n\n"
                 if isinstance(result, str):
                     try:
                         result = json.loads(result)
                     except json.JSONDecodeError:
-                        yield f"data: {json.dumps({'status': 'error', 'message': 'Invalid API response format', 'progress': 50})}\n\n"
+                        yield f"data: {json.dumps({'status': 'error', 'message': 'Format de réponse API invalide', 'progress': 50})}\n\n"
                         return
 
                 # 4. Process data
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'Processing and filtering data records...', 'progress': 60})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Traitement et filtrage des enregistrements de données...', 'progress': 60})}\n\n"
                 desired_fields = [
                     "idS", "userId", "phoneNumber", "firstName", "lastName", "gender",
                     "currentCity", "currentCountry", "hometownCity", "hometownCountry",
@@ -271,7 +365,7 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                     records = result['page']['content']
 
                 if not records:
-                    yield f"data: {json.dumps({'status': 'error', 'message': 'Aucun enregistrement trouvé dans la réponse de l\'API', 'progress': 60})}\n\n"
+                    yield f"data: {json.dumps({'status': 'error', 'message': 'Aucun enregistrement trouvé dans la réponse de l\'API.', 'progress': 60})}\n\n"
                     return
 
                 records = [
@@ -279,19 +373,19 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                 ]
 
                 if not records:
-                    yield f"data: {json.dumps({'status': 'error', 'message': 'No valid records after filtering', 'progress': 60})}\n\n"
+                    yield f"data: {json.dumps({'status': 'error', 'message': 'Aucun enregistrement valide après filtrage.', 'progress': 60})}\n\n"
                     return
 
-                yield f"data: {json.dumps({'status': 'processing', 'message': f'Found {len(records)} valid records', 'progress': 65})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': f'{len(records)} enregistrements valides trouvés.', 'progress': 65})}\n\n"
 
                 # 5. Create CSV
                 yield f"data: {json.dumps({'status': 'processing', 'message': 'Création d\'un fichier CSV à partir de données traitées...', 'progress': 70})}\n\n"
                 df = pd.DataFrame(records)
                 csv_data = df.to_csv(index=False, encoding='utf-8')
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'CSV généré avec succès', 'progress': 75})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Fichier CSV généré avec succès', 'progress': 75})}\n\n"
 
                 # 6. Create RAG analysis
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'Configuration de l\'outil d\'analyse RAG...', 'progress': 80})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Mise en place de l\'outil d\'analyse RAG...', 'progress': 80})}\n\n"
                 with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as tmp:
                     tmp.write(csv_data)
                     csv_path = tmp.name
@@ -307,7 +401,6 @@ class BusinessChatbotFlow(Flow[UserChoice]):
 
                 yield f"data: {json.dumps({'status': 'processing', 'message': 'Début de l\'analyse des données...', 'progress': 85})}\n\n"
                 logger.info("Calling expert_crew2 for analysis...")
-                # ✅ Appel correct de expert_crew2 (paramètre positionnel)
                 response = BusinessChatbot().expert_crew2().kickoff(inputs=inputs_dict)
                 yield f"data: {json.dumps({'status': 'processing', 'message': 'Analyse terminée', 'progress': 95})}\n\n"
 
@@ -320,10 +413,18 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                     "csv": csv_data,
                     "headers": df.columns.tolist()
                 }
+                assistant_text = str(response)
+                user_text = self.state.input
+                meta = {
+                    "segment": "b2c",
+                    "dataset_rows": len(df),
+                    "source": "csv_rag"
+                }
+                get_mem_service().add_interaction(u_id, a_id, r_id, user_text, assistant_text, metadata=meta)
                 yield f"data: {json.dumps(final_result)}\n\n"
 
             except Exception as e:
-                logger.error(f"B2C extraction error: {str(e)}")
+                logger.error(f"Erreur d'extraction B2C: {str(e)}")
                 import traceback
                 logger.error(f"Full traceback: {traceback.format_exc()}")
                 yield f"data: {json.dumps({'status': 'error', 'message': f'Data processing failed: {str(e)}', 'progress': -1})}\n\n"
