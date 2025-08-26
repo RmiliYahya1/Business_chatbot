@@ -1,101 +1,221 @@
-#!/usr/bin/env python
-import sys
-import warnings
-from crew import BusinessChatbot
+import logging
+import json
+import time
+import threading
+import uuid
+import queue
+import requests
+from business_chatbot.src.business_chatbot.business_flow import BusinessChatbotFlow as Processor
+from business_chatbot.src.business_chatbot.crew import BusinessChatbot
+from flask import Flask, jsonify, request, Response, stream_with_context
+from  flask_cors import CORS
+from business_chatbot.src.business_chatbot.tools.streaming_listener import flask_streaming_listener
 
-# Ignorer les avertissements de syntaxe non critiques
-warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
+agents=BusinessChatbot()
+b2b_api_url = "http://15.236.152.46:8080/api/b2b/searchByAttrExact"  # @param {type:"string"}
+b2c_api_url = "http://15.236.152.46:8080/api/b2c/searchByAttrExact"
+# Proper variable assignment for payload
+payload = {
+
+}
+
+headers = {
+    "Content-Type": "application/json",
+    "Accept": "*/*"
+}
+
+params = {'page': 10, 'size': 10, 'sortBy': '_score', 'direction': 'desc'}
+
+app= Flask(__name__)
+CORS(app)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
-def run_crew():
-    """
-    Permet à l'utilisateur de choisir un mode de test (consultation ou analyse de fichier)
-    et lance le crew avec les inputs correspondants.
-    """
-    print("🤖 Bienvenue dans l'outil de test de BusinessChatbot 🤖")
-    print("Veuillez choisir le mode d'exécution :")
-    print("1: Consultation Directe (basée sur une simple question)")
-    print("2: Analyse de Données (basée sur une question et un fichier CSV)")
+@app.route('/api/crew', methods=['POST'])
+def handle_Requests():
+    try:
+        data = request.get_json()
+        logger.info(data)
 
-    mode = input("Votre choix (1 ou 2) : ").strip()
+        user_choice = data['choice']
+        user_input = data['input']
+        user_id = data.get('userId', 'anonymous')
+        conversation_id = data.get('conversationId', str(uuid.uuid4()))
+        search_enabled = data.get('searchEnabled', False)
+        logger.info(f"Choice: {user_choice}, Input: {user_input}")
 
-    if mode == '1':
-        print("\n=== Mode : Consultation Directe ===")
-        user_question = input("Entrez votre question business/marketing : ").strip()
-        if not user_question:
-            print("Erreur : aucune question fournie. Annulation.")
-            return
-        # Les inputs pour la tâche de consultation directe
-        inputs = {'demande': user_question}
+        user_info = {'choice': user_choice, 'input': user_input,'user_id': user_id, 'conversation_id': conversation_id,'search_enabled': bool(search_enabled),}
+        processor = Processor()
+        crews_result = processor.kickoff(inputs=user_info)
+        logger.info(f"Crew result: {crews_result}")
 
-    elif mode == '2':
-        print("\n=== Mode : Analyse de Données (CSV) ===")
-        user_question = input("Entrez votre question pour guider l'analyse : ").strip()
-        csv_path = input("Entrez le chemin vers votre fichier CSV : ").strip()
 
-        if not user_question or not csv_path:
-            print("Erreur : question ou chemin de fichier manquant. Annulation.")
-            return
 
+        if user_choice in ['b2c', 'b2b']:
+            return crews_result
+
+
+    except Exception as e:
+        logger.error(f"Erreur: {str(e)}")
+        return jsonify({"response": "Désolé, une erreur s'est produite."}), 500
+
+
+@app.route('/api/stream', methods=['POST'])
+def stream_response():
+    data = request.get_json()
+    user_input = data.get('input', '')
+    user_id = data.get('userId', 'anonymous')
+    conversation_id = data.get('conversationId')
+    search_enabled = data.get('searchEnabled', False)
+    client_id = conversation_id or str(uuid.uuid4())
+
+    if not user_input.strip():
+        return jsonify({'error': 'Input is required'}), 400
+
+    @stream_with_context
+    def generate():
         try:
-            with open(csv_path, 'r', encoding='utf-8') as f:
-                csv_content = f.read()
-            print(f"Fichier CSV '{csv_path}' lu avec succès.")
 
-            # Les inputs pour la tâche d'analyse de données.
-            # Le contenu du CSV est passé dans le contexte via le dictionnaire 'inputs'.
-            # La clé 'csv_data' est un exemple ; assurez-vous que votre 'crew'
-            # est configuré pour la transmettre correctement à la tâche.
-            inputs = {
-                'demande': user_question,
-                'csv_data': csv_content
+            yield f"data: {json.dumps({'type': 'start', 'message': 'Initialisation de l IA...', 'client_id': client_id})}\n\n"
+
+
+            user_info = {
+                'choice': 'default',
+                'input': user_input,
+                'user_id': user_id,
+                'conversation_id': client_id,
+                'search_enabled': bool(search_enabled)
             }
+            processor = Processor()
 
-        except FileNotFoundError:
-            print(f"\nErreur : Le fichier '{csv_path}' n'a pas été trouvé.")
-            return
+
+            result = processor.kickoff(inputs=user_info)
+
+
+            if hasattr(result, 'raw'):
+                final_response = str(result.raw)
+            else:
+                final_response = str(result)
+
+
+            words = final_response.split()
+            for i, word in enumerate(words):
+                if i == 0:
+                    token = word
+                else:
+                    token = " " + word
+
+                chunk_data = {
+                    'type': 'chunk',
+                    'content': token,
+                    'timestamp': time.time()
+                }
+                yield f"data: {json.dumps(chunk_data)}\n\n"
+                time.sleep(0.03)
+
+            # Signal de fin
+            end_data = {
+                'type': 'final_result',
+                'content': final_response,
+                'timestamp': time.time()
+            }
+            yield f"data: {json.dumps(end_data)}\n\n"
+
         except Exception as e:
-            print(f"\nUne erreur est survenue lors de la lecture du fichier : {e}")
-            return
+            logger.error(f"Error in stream generation: {str(e)}")
+            error_data = {
+                'type': 'error',
+                'message': f'Erreur lors du traitement: {str(e)}',
+                'timestamp': time.time()
+            }
+            yield f"data: {json.dumps(error_data)}\n\n"
 
-    else:
-        print("Choix invalide. Veuillez redémarrer et choisir 1 ou 2.")
-        return
+    return Response(
+        generate(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Cache-Control',
+            'X-Accel-Buffering': 'no'
+        }
+    )
 
-    # Initialisation et lancement du crew
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    return jsonify({
+        'status': 'healthy',
+        'active_streams': len(flask_streaming_listener.active_streams),
+        'timestamp': time.time()
+    })
+
+
+# Gestionnaire d'erreurs pour les routes streaming
+@app.errorhandler(Exception)
+def handle_streaming_error(error):
+    if request.path.startswith('/api/stream'):
+        logger.error(f"Streaming error: {str(error)}")
+
+        def error_stream():
+            error_data = {
+                'type': 'server_error',
+                'message': 'Erreur interne du serveur',
+                'timestamp': time.time()
+            }
+            yield f"data: {json.dumps(error_data)}\n\n"
+
+        return Response(error_stream(), mimetype='text/event-stream', status=500)
+
+    return jsonify({'error': 'Internal server error'}), 500
+
+
+app.route('/api/stream1', methods=['POST'])
+def handle_streaming_requests():
     try:
-        print("\n🚀 Lancement du crew...")
-        chatbot_crew = BusinessChatbot().crew()
-        result = chatbot_crew.kickoff(inputs=inputs)
+        data = request.get_json()
+        user_choice = data.get('choice')
+        user_input = data.get('input')
 
-        print("\n--- ✅ Réponse Finale de l'Agent ---")
-        print(result)
+        if user_choice != 'b2c':
+            return jsonify({"error": "This endpoint only supports B2C streaming requests"}), 400
+
+        def progress_generator():
+            user_info = {'choice': user_choice, 'input': user_input}
+            processor = Processor()
+
+            # Yield progress updates directly from processor
+            for update in processor.kickoff(inputs=user_info):
+                yield f"data: {json.dumps(update)}\n\n"
+
+        response = Response(
+            progress_generator(),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+                'Connection': 'keep-alive',
+                'X-Accel-Buffering': 'no',  # Nginx
+                'X-Sendfile-Type': '',  # Apache
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Cache-Control'
+            }
+        )
+
+        # Disable buffering at the response level
+        response.implicit_sequence_conversion = False
+        return response
 
     except Exception as e:
-        print(f"\nUne erreur critique est survenue pendant l'exécution du crew : {e}")
+        logger.error(f"Streaming error: {str(e)}")
+        return Response(
+            f"data: {json.dumps({'status': 'error', 'message': str(e)})}\n\n",
+            mimetype='text/event-stream'
+        )
 
-
-def replay():
-    """
-    Relance l'exécution d'un crew à partir d'une tâche spécifique (pour le débogage).
-    """
-    if len(sys.argv) < 2:
-        print("Usage: python main.py replay <task_id>")
-        return
-
-    task_id = sys.argv[1]
-    print(f"=== Tentative de Replay pour la tâche : {task_id} ===")
-
-    try:
-        BusinessChatbot().crew().replay(task_id=task_id)
-    except Exception as e:
-        print(f"Erreur lors du replay : {e}")
-
-
-if __name__ == "__main__":
-    # Permet d'appeler la fonction de replay via la ligne de commande,
-    # ex: python main.py replay <ID_DE_LA_TACHE>
-    if len(sys.argv) > 1 and sys.argv[1].lower() == 'replay':
-        replay()
-    else:
-        run_crew()
+if __name__ == '__main__':
+    # Importer et initialiser l'event listener
+    print("Initializing streaming event listener...")
+    app.run(debug=True, port=3002, threaded=True, use_reloader=False)

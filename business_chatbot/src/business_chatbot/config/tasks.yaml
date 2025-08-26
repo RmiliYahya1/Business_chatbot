@@ -1,50 +1,372 @@
+b2b_retreiving:
+  description: >
+    Transforme cette requête de recherche B2B : {user_query} en forme JSON.
+    
+    examples pour s'entrainer: 
+    
+        {"input": "restaurants opérationnels en Californie avec horaires d'ouverture actuels", "output": '{"state": "California", "mainCategory": "Restaurant", "isTemporarilyClosed": false, "workdayTiming": "*"}'},
+        {"input": "hôtels actifs en Floride avec disponibilité de réservation", "output": '{"state": "Florida", "mainCategory": "Hotel", "isTemporarilyClosed": false, "canClaim": true}'},
+        {"input": "stations-service fonctionnelles au Texas avec service 24h/24", "output": '{"state": "Texas", "mainCategory": "Gas station", "isTemporarilyClosed": false, "workdayTiming": "24"}'},
+        {"input": "cafés ouverts à Washington avec horaires matinaux", "output": '{"state": "Washington", "mainCategory": "Coffee shop", "isTemporarilyClosed": false, "workdayTiming": "morning"}'},
+        {"input": "banques en activité à New York avec services complets", "output": '{"state": "New York", "mainCategory": "Bank", "isTemporarilyClosed": false, "description": "full service"}'},
+
+        # International + Spécifique à l'industrie
+        {"input": "startups technologiques en France avec focus IA et financement", "output": '{"countryCode": "FR", "mainCategory": "Software company", "description": "AI startup funding"}'},
+        {"input": "entreprises pharmaceutiques en Allemagne avec installations de recherche", "output": '{"countryCode": "DE", "mainCategory": "Pharmaceutical company", "description": "research"}'},
+        {"input": "constructeurs automobiles au Japon avec production de véhicules électriques", "output": '{"countryCode": "JP", "mainCategory": "Automotive company", "description": "electric vehicle"}'},
+        {"input": "services financiers en Suisse avec banque privée", "output": '{"countryCode": "CH", "mainCategory": "Financial service", "description": "private banking"}'},
+        {"input": "compagnies énergétiques en Norvège avec focus renouvelable", "output": '{"countryCode": "NO", "mainCategory": "Energy company", "description": "renewable"}'},
+
+        # Propriétaire + Contact + Vérification
+        {"input": "restaurants avec propriétaires vérifiés et informations de contact disponibles", "output": '{"mainCategory": "Restaurant", "canClaim": true, "phone": "*", "ownerName": "*"}'},
+        {"input": "hôtels avec profils de propriétaires et contact de réservation directe", "output": '{"mainCategory": "Hotel", "ownerName": "*", "phone": "*", "website": "*"}'},
+        {"input": "cabinets d'avocats avec informations sur les associés et réservation de consultation", "output": '{"mainCategory": "Law firm", "ownerName": "*", "phone": "*", "description": "partner"}'},
+        {"input": "entreprises technologiques avec détails des fondateurs et contact recrutement", "output": '{"mainCategory": "Software company", "ownerName": "*", "mockEmail": "*", "description": "founder"}'},
+        {"input": "cabinets de conseil avec équipe dirigeante et contact professionnel", "output": '{"mainCategory": "Business management consultant", "ownerName": "*", "phone": "*", "description": "leadership"}'},
+
+        # Gamme de prix + Positionnement marché
+        {"input": "restaurants de luxe dans des emplacements premium avec restauration haut de gamme", "output": '{"mainCategory": "Restaurant", "priceRange": "expensive", "description": "luxury premium upscale"}'},
+        {"input": "hôtels économiques avec tarifs abordables et équipements de base", "output": '{"mainCategory": "Hotel", "priceRange": "inexpensive", "description": "budget affordable"}'},
+        {"input": "cafés milieu de gamme avec prix compétitifs", "output": '{"mainCategory": "Coffee shop", "priceRange": "moderate", "description": "competitive"}'},
+        {"input": "cabinets d'avocats premium avec services juridiques haut de gamme", "output": '{"mainCategory": "Law firm", "priceRange": "expensive", "description": "premium high-end"}'},
+        {"input": "conseil rentable avec solutions axées sur la valeur", "output": '{"mainCategory": "Business management consultant", "priceRange": "moderate", "description": "cost-effective value"}'},
+
+        
+        # Fermé temporairement + Récupération
+        {"input": "restaurants temporairement fermés prévoyant de rouvrir", "output": '{"mainCategory": "Restaurant", "isTemporarilyClosed": true, "description": "reopen"}'},
+        {"input": "hôtels en rénovation avec réservation future", "output": '{"mainCategory": "Hotel", "isTemporarilyClosed": true, "description": "renovation"}'},
+        {"input": "cafés fermés pour réaménagement", "output": '{"mainCategory": "Coffee shop", "isTemporarilyClosed": true, "description": "remodeling"}'},
+        {"input": "banques temporairement fermées pour mises à niveau système", "output": '{"mainCategory": "Bank", "isTemporarilyClosed": true, "description": "upgrade"}'},
+        {"input": "stations-service fermées pour maintenance", "output": '{"mainCategory": "Gas station", "isTemporarilyClosed": true, "description": "maintenance"}'},
+
+        # Fermé définitivement + Historique
+        {"input": "restaurants fermés définitivement pour analyse de marché", "output": '{"mainCategory": "Restaurant", "isPermanentlyClosed": true, "description": "market analysis"}'},
+        {"input": "hôtels défunts pour étude immobilière", "output": '{"mainCategory": "Hotel", "isPermanentlyClosed": true, "description": "real estate"}'},
+        {"input": "emplacements de cafés fermés pour recherche de site", "output": '{"mainCategory": "Coffee shop", "isPermanentlyClosed": true, "description": "site research"}'},
+        {"input": "anciennes agences bancaires pour analyse financière", "output": '{"mainCategory": "Bank", "isPermanentlyClosed": true, "description": "financial analysis"}'},
+        {"input": "cabinets d'avocats fermés pour étude du marché juridique", "output": '{"mainCategory": "Law firm", "isPermanentlyClosed": true, "description": "legal market"}'},
+
+        # Notes zéro/faibles + Potentiel de récupération
+        {"input": "restaurants mal notés avec potentiel d'amélioration", "output": '{"mainCategory": "Restaurant", "rating": 1, "description": "improvement potential"}'},
+        {"input": "hôtels mal notés cherchant changement de direction", "output": '{"mainCategory": "Hotel", "rating": 1, "description": "management change"}'},
+        {"input": "cafés en difficulté avec nouveaux propriétaires", "output": '{"mainCategory": "Coffee shop", "rating": 2, "description": "new ownership"}'},
+        {"input": "banques sous-performantes avec plans de restructuration", "output": '{"mainCategory": "Bank", "rating": 1, "description": "restructuring"}'},
+        {"input": "cabinets d'avocats en difficulté avec changements de partenariat", "output": '{"mainCategory": "Law firm", "rating": 2, "description": "partnership changes"}'},
+
+        # Pas d'informations de contact + Investigation
+        {"input": "restaurants sans numéros de téléphone listés", "output": '{"mainCategory": "Restaurant", "phone": ""}'},
+        {"input": "hôtels manquant de détails de contact", "output": '{"mainCategory": "Hotel", "phone": "", "mockEmail": ""}'},
+        {"input": "cafés sans présence web", "output": '{"mainCategory": "Coffee shop", "website": ""}'},
+        {"input": "banques sans contacts email publics", "output": '{"mainCategory": "Bank", "mockEmail": ""}'},
+        {"input": "cabinets d'avocats manquant de présence en ligne", "output": '{"mainCategory": "Law firm", "website": "", "phone": ""}'},
+
+        # Entreprises non réclamées + Analyse d'opportunité
+        {"input": "restaurants non réclamés pour recherche d'acquisition", "output": '{"mainCategory": "Restaurant", "canClaim": false, "description": "acquisition research"}'},
+        {"input": "hôtels non vérifiés pour opportunités d'investissement", "output": '{"mainCategory": "Hotel", "canClaim": false, "description": "investment"}'},
+        {"input": "cafés non réclamés pour expansion de franchise", "output": '{"mainCategory": "Coffee shop", "canClaim": false, "description": "franchise expansion"}'},
+        {"input": "banques non vérifiées pour conformité réglementaire", "output": '{"mainCategory": "Bank", "canClaim": false, "description": "regulatory compliance"}'},
+        {"input": "cabinets d'avocats non réclamés pour consolidation de marché", "output": '{"mainCategory": "Law firm", "canClaim": false, "description": "market consolidation"}'},
+
+        # Catégories manquantes + Classification
+        {"input": "entreprises sans catégories définies", "output": '{"mainCategory": "", "description": "category classification needed"}'},
+        {"input": "prestataires de services non classifiés", "output": '{"categories": "", "description": "service classification"}'},
+        {"input": "entreprises avec focus industriel peu clair", "output": '{"mainCategory": "", "description": "industry focus unclear"}'},
+        {"input": "entreprises nécessitant vérification du type d'activité", "output": '{"categories": "", "description": "type verification"}'},
+        {"input": "entreprises nécessitant attribution de catégorie", "output": '{"mainCategory": "", "description": "category assignment"}'},
+
+        # REQUÊTES À MOTIFS RÉPÉTITIFS (20 exemples)
+        # Motif : "Entreprises à [Ville]"
+        {"input": "entreprises à Seattle", "output": '{"city": "Seattle"}'},
+        {"input": "entreprises à Portland", "output": '{"city": "Portland"}'},
+        {"input": "entreprises à Denver", "output": '{"city": "Denver"}'},
+        {"input": "entreprises à Austin", "output": '{"city": "Austin"}'},
+        {"input": "entreprises à Miami", "output": '{"city": "Miami"}'},
+
+        # Motif : "[Type d'entreprise] avec [Qualité]"
+        {"input": "restaurants avec excellentes notes", "output": '{"mainCategory": "Restaurant", "rating": 5}'},
+        {"input": "hôtels avec excellentes notes", "output": '{"mainCategory": "Hotel", "rating": 5}'},
+        {"input": "cafés avec excellentes notes", "output": '{"mainCategory": "Coffee shop", "rating": 5}'},
+        {"input": "banques avec excellentes notes", "output": '{"mainCategory": "Bank", "rating": 5}'},
+        {"input": "cabinets d'avocats avec excellentes notes", "output": '{"mainCategory": "Law firm", "rating": 5}'},
+
+        # Motif : "[Type d'entreprise] dépensant en publicité"
+        {"input": "restaurants dépensant en publicité", "output": '{"mainCategory": "Restaurant", "isSpendingOnAds": true}'},
+        {"input": "hôtels dépensant en publicité", "output": '{"mainCategory": "Hotel", "isSpendingOnAds": true}'},
+        {"input": "cafés dépensant en publicité", "output": '{"mainCategory": "Coffee shop", "isSpendingOnAds": true}'},
+        {"input": "banques dépensant en publicité", "output": '{"mainCategory": "Bank", "isSpendingOnAds": true}'},
+        {"input": "cabinets d'avocats dépensant en publicité", "output": '{"mainCategory": "Law firm", "isSpendingOnAds": true}'},
+
+        # Motif : "Entreprises en [Pays]"
+        {"input": "entreprises en France", "output": '{"countryCode": "FR"}'},
+        {"input": "entreprises en Allemagne", "output": '{"countryCode": "DE"}'},
+        {"input": "entreprises au Canada", "output": '{"countryCode": "CA"}'},
+        {"input": "entreprises au Royaume-Uni", "output": '{"countryCode": "GB"}'},
+        {"input": "entreprises au Japon", "output": '{"countryCode": "JP"}'},
+
+        # REQUÊTES EN LANGAGE NATUREL HUMAIN (13 exemples - condensés pour l'espace)
+        {"input": "Je cherche de très bons restaurants dans le centre-ville de Paris, vous savez, le genre avec une excellente ambiance et une excellente cuisine que les locaux fréquentent vraiment", "output": '{"city": "Paris", "mainCategory": "Restaurant", "rating": 4, "address": "downtown", "description": "local atmosphere excellent"}'},
+        {"input": "Pouvez-vous m'aider à trouver des hôtels de luxe à Manhattan ? J'ai besoin de quelque chose d'haut de gamme pour des clients d'affaires, de préférence avec des installations de conférence et un service cinq étoiles", "output": '{"city": "New York", "mainCategory": "Hotel", "rating": 5, "priceRange": "expensive", "address": "Manhattan", "description": "luxury upscale conference business"}'},
+        {"input": "Je fais une étude de marché sur les cafés dans la région de Seattle - spécifiquement intéressé par les endroits qui se commercialisent activement et ont une clientèle solide", "output": '{"city": "Seattle", "mainCategory": "Coffee shop", "isSpendingOnAds": true, "reviews": 50, "description": "market research marketing"}'},
+        {"input": "Mon client veut comprendre le paysage concurrentiel des cabinets de conseil à Chicago, particulièrement ceux qui servent les entreprises du Fortune 500 et ont établi des partenariats", "output": '{"city": "Chicago", "mainCategory": "Business management consultant", "rating": 4, "description": "Fortune 500 competitive landscape partnerships"}'},
+        {"input": "Nous analysons le marché des services juridiques à Boston et avons besoin de données sur les cabinets d'avocats qui gèrent les fusions-acquisitions d'entreprises et ont de solides antécédents", "output": '{"city": "Boston", "mainCategory": "Law firm", "rating": 4, "description": "corporate mergers acquisitions legal services market"}'},
+        {"input": "Je cherche des cibles d'acquisition potentielles - des restaurants en Californie qui sont bien établis mais pourraient être sous-évalués ou cherchent de nouveaux propriétaires", "output": '{"state": "California", "mainCategory": "Restaurant", "rating": 3, "description": "acquisition targets undervalued new ownership"}'},
+        {"input": "Notre fonds d'investissement examine les opportunités du secteur hôtelier, particulièrement les hôtels en Floride qui ont de solides performances mais de la place pour des améliorations opérationnelles", "output": '{"state": "Florida", "mainCategory": "Hotel", "rating": 3, "description": "investment hospitality operational improvements"}'},
+        {"input": "Pouvez-vous identifier des entreprises technologiques à Austin qui sont soutenues par du capital-risque, ont des modèles commerciaux prouvés, mais pourraient être ouvertes à des partenariats stratégiques ou une acquisition ?", "output": '{"city": "Austin", "mainCategory": "Software company", "description": "venture-backed proven business model strategic partnerships acquisition"}'},
+        {"input": "Nous faisons une due diligence sur le secteur bancaire au Texas, spécifiquement à la recherche de banques régionales avec de solides liens communautaires et un potentiel de croissance", "output": '{"state": "Texas", "mainCategory": "Bank", "rating": 4, "description": "due diligence regional community ties growth potential"}'},
+        {"input": "J'ai besoin de renseignements sur les entreprises pharmaceutiques en Allemagne qui se concentrent sur la recherche et développement, particulièrement celles avec des produits de pipeline innovants", "output": '{"countryCode": "DE", "mainCategory": "Pharmaceutical company", "description": "research development innovative pipeline"}'},
+        {"input": "Aidez-moi à comprendre quels cabinets de conseil à New York remportent le plus d'engagements clients de haut niveau et investissent massivement dans le développement commercial", "output": '{"city": "New York", "mainCategory": "Business management consultant", "rating": 4, "isSpendingOnAds": true, "description": "high-profile client business development"}'},
+        {"input": "J'analyse les parts de marché pour les chaînes de cafés versus les opérateurs indépendants à Portland - j'ai besoin de données sur les établissements franchisés et locaux", "output": '{"city": "Portland", "mainCategory": "Coffee shop", "description": "market share chains independent franchise locally-owned"}'},
+        {"input": "Notre cabinet fait du benchmarking des cabinets d'avocats à Londres, spécifiquement ceux qui servent les multinationales et ont une présence internationale significative", "output": '{"city": "London", "mainCategory": "Law firm", "rating": 4, "description": "benchmarking multinational corporations international presence"}'},
+        
+        {"input": "format téléphone international +33", "output": '{"phone": "+33"}'},
+        {"input": "numéros de téléphone avec extensions", "output": '{"phone": "555-1234 ext 100"}'},
+        {"input": "numéros mobiles vs fixes", "output": '{"phone": "mobile"}'},
+        {"input": "numéros gratuits", "output": '{"phone": "800"}'},
+        {"input": "numéros de téléphone incomplets", "output": '{"phone": "555-"}'}
+        {"input": "format international UK", "output": "{\"phone\": \"+44 20 7946 0958\"}"}
+        {"input": "format téléphone USA", "output": "{\"phone\": \"+1 212-555-1234\"}"}
+        
+        {"input": "Cafés qui ferment leur portes à dimanche" , "output":'{"mainCategory": "Coffee shop","closedOn":"\"\[\'Sunday\'\]\""}'
+        {"input": "Cafés qui ferment leur portes à samedi à lundi" , "output":'{"mainCategory": "Coffee shop","closedOn":"\"\[\'Monday\',\'Saturday\',\'Sunday'\]\""}'
+        {"input": "Restaurants fermés le mercredi", "output": '{"mainCategory": "Restaurant", "closedOn": "\"\['Wednesday'\]\""}'
+        
+        {"input": "emails d'entreprise avec sous-domaines", "output": '{"email": \"company\.co\.uk\"}'},
+        {"input": "adresses email universitaires", "output": '{"email": \"university\.edu\"}'},
+        {"input": "domaines email gouvernementaux", "output": '{"email": "\.gov"}'},
+        {"input": "extensions email internationales", "output": '{"email": "\.de"}'},
+        {"input": "formats email non standard", "output": '{"email": "custom-domain.info"}'},
+    
+        tu te limite dans les attributs suivants :[placeId,name,description,isSpendingOnAds,reviews,rating,competitors,website,mockEmail,phone,canClaim,ownerId,ownerName,ownerLink,featuredImage,mainCategory,categories,workdayTiming,isTemporarilyClosed,isPermanentlyClosed,closedOn,address,reviewKeywords,link,status,priceRange,reviewsPerRating,featuredQuestion,reviewsLink,latitude,longitude,coordinates,plusCode,ward,street,city,postalCode,state,countryCode,timeZone,cid,dataId,about,images,hours,popularTimes,mostPopularTimes,featuredReviews,detailedReviews,query,score,scoreCategory]
+
+  expected_output: >
+    {
+      "":"",
+      "":""
+      }
+  agent: b2b_specialist
+
+
+b2c_retreiving:
+  description: >
+        Transforme cette requête de recherche B2C : {user_query} en format JSON.
+    
+        exemples pour s'entrainer:
+      
+            # Recherches par nom (5 exemples)
+            {"input": "Trouve John", "output": '{"firstName": "John"}'},
+            {"input": "personnes nommées Sarah", "output": '{"firstName": "Sarah"}'},
+            {"input": "utilisateurs avec nom de famille Smith", "output": '{"lastName": "Smith"}'},
+            {"input": "Maria Garcia", "output": '{"firstName": "Maria", "lastName": "Garcia"}'},
+            {"input": "prénom David", "output": '{"firstName": "David"}'},
+
+            # Recherches géographiques (5 exemples)
+            {"input": "personnes à Paris", "output": '{"currentCity": "Paris"}'},
+            {"input": "Les femmes de Paris", "output": '{"currentCity": "Paris", "gender":"female"}'},
+            {"input": "utilisateurs de France", "output": '{"currentCountry": "France"}'},
+            {"input": "résidents à Londres", "output": '{"currentCity": "London"}'},
+            {"input": "d'Allemagne", "output": '{"hometownCountry": "Germany"}'},
+            {"input": "ville natale Madrid", "output": '{"hometownCity": "Madrid"}'},
+
+            # Recherches par genre (5 exemples)
+            {"input": "utilisatrices femmes", "output": '{"gender": "female"}'},
+            {"input": "personnes hommes", "output": '{"gender": "male"}'},
+            {"input": "femmes", "output": '{"gender": "female"}'},
+            {"input": "hommes", "output": '{"gender": "male"}'},
+            {"input": "résidentes femmes", "output": '{"gender": "female"}'},
+
+            # Statut relationnel (5 exemples)
+            {"input": "personnes célibataires", "output": '{"relationshipStatus": "single"}'},
+            {"input": "utilisateurs mariés", "output": '{"relationshipStatus": "married"}'},
+            {"input": "individus divorcés", "output": '{"relationshipStatus": "divorced"}'},
+            {"input": "personnes veuves", "output": '{"relationshipStatus": "widowed"}'},
+            {"input": "utilisateurs fiancés", "output": '{"relationshipStatus": "engaged"}'},
+
+            # Informations de contact (5 exemples)
+            {"input": "numéro de téléphone 3366481246", "output": '{"phoneNumber": "3366481246"}'},
+            {"input": "email john@gmail.com", "output": '{"email": "john@gmail.com"}'},
+            {"input": "utilisateurs gmail", "output": '{"email": "gmail.com"}'},
+            {"input": "emails yahoo.com", "output": '{"email": "yahoo.com"}'},
+            {"input": "utilisateurs business.org", "output": '{"email": "business.org"}'},
+
+            # Recherches d'emploi (5 exemples)
+            {"input": "employés chez Google", "output": '{"workplace": "Google"}'},
+            {"input": "travailleurs Microsoft", "output": '{"workplace": "Microsoft"}'},
+            {"input": "employés Apple", "output": '{"workplace": "Apple"}'},
+            {"input": "personnel Amazon", "output": '{"workplace": "Amazon"}'},
+            {"input": "travailleurs Facebook", "output": '{"workplace": "Facebook"}'},
+
+            # Recherches ID utilisateur (5 exemples)
+            {"input": "ID utilisateur 857440745361057978", "output": '{"userId": "857440745361057978"}'},
+            {"input": "userID 1613161240337249929", "output": '{"userId": "1613161240337249929"}'},
+            {"input": "ID 234567890123456789", "output": '{"userId": "234567890123456789"}'},
+            {"input": "utilisateur 987654321098765432", "output": '{"userId": "987654321098765432"}'},
+            {"input": "profil 456789012345678901", "output": '{"userId": "456789012345678901"}'},
+
+            # REQUÊTES MULTI-CHAMPS COMPLEXES (35 exemples) - Requêtes avancées combinant plusieurs critères
+
+            # Démographie + Géographie (5 exemples)
+            {"input": "femmes françaises", "output": '{"gender": "female", "currentCountry": "France"}'},
+            {"input": "hommes allemands vivant à Berlin", "output": '{"gender": "male", "currentCountry": "Germany", "currentCity": "Berlin"}'},
+            {"input": "femmes américaines de Californie", "output": '{"gender": "female", "currentCountry": "USA", "currentRegion": "California"}'},
+            {"input": "hommes britanniques à Londres", "output": '{"gender": "male", "currentCountry": "UK", "currentCity": "London"}'},
+            {"input": "femmes espagnoles de Madrid", "output": '{"gender": "female", "hometownCountry": "Spain", "hometownCity": "Madrid"}'},
+
+            # Relation + Démographie (5 exemples)
+            {"input": "femmes célibataires", "output": '{"gender": "female", "relationshipStatus": "single"}'},
+            {"input": "hommes mariés", "output": '{"gender": "male", "relationshipStatus": "married"}'},
+            {"input": "femmes divorcées", "output": '{"gender": "female", "relationshipStatus": "divorced"}'},
+            {"input": "hommes fiancés", "output": '{"gender": "male", "relationshipStatus": "engaged"}'},
+            {"input": "femmes veuves", "output": '{"gender": "female", "relationshipStatus": "widowed"}'},
+
+            # Emploi + Démographie (5 exemples)
+            {"input": "employées femmes Google", "output": '{"gender": "female", "workplace": "Google"}'},
+            {"input": "travailleurs hommes Microsoft", "output": '{"gender": "male", "workplace": "Microsoft"}'},
+            {"input": "femmes travaillant chez Apple", "output": '{"gender": "female", "workplace": "Apple"}'},
+            {"input": "hommes chez Amazon", "output": '{"gender": "male", "workplace": "Amazon"}'},
+            {"input": "employées femmes Tesla", "output": '{"gender": "female", "workplace": "Tesla"}'},
+
+            # Mobilité géographique (5 exemples)
+            {"input": "personnes de Paris vivant à Londres", "output": '{"hometownCity": "Paris", "currentCity": "London"}'},
+            {"input": "utilisateurs d'Allemagne maintenant aux USA", "output": '{"hometownCountry": "Germany", "currentCountry": "USA"}'},
+            {"input": "natifs français au Canada", "output": '{"hometownCountry": "France", "currentCountry": "Canada"}'},
+            {"input": "natifs de New York en Californie", "output": '{"hometownCity": "New York", "currentRegion": "California"}'},
+            {"input": "Londoniens vivant à Paris", "output": '{"hometownCity": "London", "currentCity": "Paris"}'},
+            
+
+            # Combinaisons complexes (5 exemples)
+            {"input": "femmes françaises célibataires à Paris", "output": '{"gender": "female", "relationshipStatus": "single", "currentCountry": "France", "currentCity": "Paris"}'},
+            {"input": "hommes allemands mariés travaillant chez BMW", "output": '{"gender": "male", "relationshipStatus": "married", "currentCountry": "Germany", "workplace": "BMW"}'},
+            {"input": "femmes américaines divorcées du Texas", "output": '{"gender": "female", "relationshipStatus": "divorced", "currentCountry": "USA", "currentRegion": "Texas"}'},
+            {"input": "hommes britanniques fiancés dans la technologie", "output": '{"gender": "male", "relationshipStatus": "engaged", "currentCountry": "UK"}'},
+            {"input": "femmes italiennes célibataires nommées Maria", "output": '{"firstName": "Maria", "gender": "female", "relationshipStatus": "single", "currentCountry": "Italy"}'},
+
+            # Démographie professionnelle (5 exemples)
+            {"input": "ingénieures femmes chez Microsoft", "output": '{"gender": "female", "workplace": "Microsoft"}'},
+            {"input": "designers hommes chez Apple", "output": '{"gender": "male", "workplace": "Apple"}'},
+            {"input": "développeuses femmes chez Google", "output": '{"gender": "female", "workplace": "Google"}'},
+            {"input": "consultants hommes chez McKinsey", "output": '{"gender": "male", "workplace": "McKinsey"}'},
+            {"input": "analystes femmes chez Goldman Sachs", "output": '{"gender": "female", "workplace": "Goldman Sachs"}'},
+
+            # Spécificités régionales (5 exemples)
+    
+            {"input": "personnes en région Provence", "output": '{"currentRegion": "Provence"}'},
+            {"input": "utilisateurs de région Occitanie", "output": '{"currentRegion": "Occitanie"}'},
+            {"input": "résidents des Pyrénées-Orientales", "output": '{"currentDepartment": "Pyrénées-Orientales"}'},
+            {"input": "personnes d'Île-de-France", "output": '{"currentRegion": "Île-de-France"}'},
+            {"input": "utilisateurs des Hauts-de-Seine", "output": '{"currentDepartment": "Hauts-de-Seine"}'},
+
+            # CAS EXCEPTIONNELS ET LIMITES (30 exemples) - Gestion de scénarios inhabituels et conditions limites
+
+            # Données manquantes/inconnues (5 exemples)
+            {"input": "utilisateurs sans email", "output": '{"email": ""}'},
+            {"input": "personnes sans numéro de téléphone", "output": '{"phoneNumber": ""}'},
+            {"input": "statut relationnel inconnu", "output": '{"relationshipStatus": "unknown"}'},
+            {"input": "aucun lieu de travail listé", "output": '{"workplace": ""}'},
+            {"input": "genre non spécifié", "output": '{"gender": "other"}'},
+
+            # Caractères spéciaux et formatage (5 exemples)
+            {"input": "noms avec accents comme François", "output": '{"firstName": "François"}'},
+            {"input": "José María García", "output": '{"firstName": "José María", "lastName": "García"}'},
+            {"input": "utilisateurs avec noms à trait d'union comme Jean-Pierre", "output": '{"firstName": "Jean-Pierre"}'},
+            {"input": "nom de famille O\'Connor", "output": '{"lastName": "O\'Connor"}'},
+            {"input": "noms avec apostrophes comme D\'Angelo", "output": '{"lastName": "D\'Angelo"}'},
+
+            # Variations internationales (5 exemples)
+            {"input": "utilisateurs des Émirats Arabes Unis", "output": '{"currentCountry": "United Arab Emirates"}'},
+            {"input": "personnes du Royaume-Uni", "output": '{"currentCountry": "United Kingdom"}'},
+            {"input": "résidents aux États-Unis", "output": '{"currentCountry": "United States"}'},
+            {"input": "de République Tchèque", "output": '{"currentCountry": "Czech Republic"}'},
+            {"input": "résidents d'Arabie Saoudite", "output": '{"currentCountry": "Saudi Arabia"}'},
+
+            # Motifs d'email complexes (5 exemples)
+            {"input": "emails d'entreprise avec sous-domaines", "output": '{"email": "company.co.uk"}'},
+            {"input": "adresses email universitaires", "output": '{"email": "university.edu"}'},
+            {"input": "domaines email gouvernementaux", "output": '{"email": ".gov"}'},
+            {"input": "extensions email internationales", "output": '{"email": ".de"}'},
+            {"input": "formats email non standard", "output": '{"email": "custom-domain.info"}'},
+
+            # Variations numéros de téléphone (5 exemples)
+            {"input": "format téléphone international +33", "output": '{"phoneNumber": "+33"}'},
+            {"input": "numéros de téléphone avec extensions", "output": '{"phoneNumber": "555-1234 ext 100"}'},
+            {"input": "numéros mobiles vs fixes", "output": '{"phoneNumber": "mobile"}'},
+            {"input": "numéros gratuits", "output": '{"phoneNumber": "800"}'},
+            {"input": "numéros de téléphone incomplets", "output": '{"phoneNumber": "555-"}'},
+    
+    
+            
+            {"input": "Les hommes d'origine Marocaine", "output": {"hometownCountry": "Morocco"}},
+            {"input": "Les hommes d'origine Algérienne", "output": {"hometownCountry": "Algeria"}},
+            {"input": "Les hommes d'origine Libyenne", "output": {"hometownCountry": "Libya"}},
+            {"input": "Les hommes d'origine Égyptienne", "output": {"hometownCountry": "Egypt"}},
+            {"input": "Les hommes d'origine Française", "output": {"hometownCountry": "France"}},
+            {"input": "Les hommes d'origine Espagnole", "output": {"hometownCountry": "Spain"}},
+            {"input": "Les hommes d'origine Italienne", "output": {"hometownCountry": "Italy"}},
+            {"input": "Les hommes d'origine Allemande", "output": {"hometownCountry": "Germany"}},
+            {"input": "Les hommes d'origine Belge", "output": {"hometownCountry": "Belgium"}},
+            {"input": "Les hommes d'origine Canadienne", "output": {"hometownCountry": "Canada"}},
+            {"input": "Les hommes d'origine Américaine", "output": {"hometownCountry": "USA"}},
+            {"input": "Les hommes d'origine Brésilienne", "output": {"hometownCountry": "Brazil"}},
+            {"input": "Les hommes d'origine Chinoise", "output": {"hometownCountry": "China"}},
+            {"input": "Les hommes d'origine Japonaise", "output": {"hometownCountry": "Japan"}},
+            {"input": "Les hommes d'origine Australienne", "output": {"hometownCountry": "Australia"}}
+            {"input": "Les hommes d'origine senegalaise", "output": {"hometownCountry": "Senegal"}}
+    
+        tu te limite dans les attributs suivants :[idS,userId,phoneNumber,firstName,lastName,gender,currentCity,currentCountry,hometownCity,hometownCountry,relationshipStatus,workplace,email,currentDepartment,currentRegion]
+  expected_output: >
+    {
+    "":"",
+    "":""
+    }
+  agent: b2c_specialist
+
+
 direct_consultation:
   description: >
-    Réponds à la demande suivante de l'utilisateur : {demande}
-    Analyser la demande textuelle de l'utilisateur et fournir une réponse experte immédiate
-    en tant qu'analyste senior en marketing data et intelligence commerciale.
+    [POLICY]
+    - Domaine autorisé: business, finance, économie, marketing, BI, comportement d'achat, gestion d'entreprise.
+    - Hors périmètre: cuisine/recettes, programmation, santé, juridique, divertissement, sport, etc.
+    - Si hors périmètre → appliquer strictement le "Modèle de refus" ci-dessous.
+    - N'expose pas la bio utilisateur ou des détails mémorisés, sauf si on le demande explicitement.
+    - N'écris jamais "Tu es [prénom], [âge]..." dans un refus.
+    - N'écho pas de réponse précédente; crée une réponse nouvelle.
 
-    Cette tâche est activée quand AUCUN bouton (B2B/B2C) n'est sélectionné.
-    L'utilisateur pose une question générale nécessitant des conseils stratégiques immédiats.
+    [MODELES]
+    - Refus hors périmètre (obligatoire) :
+      "Désolé, ce sujet sort de mon périmètre (business/finance/marketing/BI).
+       Je peux vous aider sur : [3 sujets alignés]."
 
-    Processus à suivre :
-    1. Analyser l'intention et le contexte de la demande utilisateur
-    2. Identifier le domaine d'expertise requis (marketing, BI, comportement d'achat)
-    3. Générer une réponse  directe basée sur ton expertise
-    4. Adapter le ton et le niveau technique à l'audience identifiée
+    [ENTRÉE UTILISATEUR]
+    {user_query}
 
-    La réponse doit être autonome, sans référence à des données externes ou fichiers.
-    Focus sur les conseils pratiques et actionnables.
+    [INSTRUCTIONS DE RÉPONSE]
+    - Si salutation/confirmation simple → réponse brève (≤ 20 mots).
+    - Si question on-topic → réponse claire en 3–6 puces + 1 action concrète.
+    - Si l'utilisateur vous remercie ou confirme sa satisfaction de la réponse -> réponse chaleureuse courte + propose de l'aide encore
+    - Si hors périmètre → utiliser exactement le modèle de refus.
+    - N’insère pas le texte du MEMORY CONTEXT tel quel; utilise-le seulement pour personnaliser.
+
   expected_output: >
-    Une réponse consultative complète en format markdown avec des titres pertinents choisis par l'agent.
-    Structure recommandée (titres à adapter selon le contexte) :
-    - Une section de synthèse/compréhension de la demande
-    - Une section d'analyse experte du contexte business  
-    - Une section de recommandations stratégiques concrètes
-    - Une section d'actions prioritaires si applicable
-    L'agent doit choisir des titres de sections (## Titre) qui correspondent naturellement 
-    au sujet traité et au contexte business identifié.
+    - Salutation/confirmation: courte, naturelle.
+    - On-topic: 3–6 puces, actionable, cohérente avec l’historique sans divulgation inutile.
+    - Off-topic: refus bref + 3 pistes on-topic.
   agent: business_expert
-  guardrail: Vérifier que la réponse ne mentionne aucun fichier CSV ou données externes.
-  output_file: "direct_response.md"
+
 
 data_analysis_synthesis:
   description: >
-    Interpréter et synthétiser des données CSV B2B ou B2C générées par les agents spécialisés,
+    Interpréter et synthétiser un échantillon de données CSV B2B ou B2C générées par les agents spécialisés,
     puis créer une réponse enrichie pour l'utilisateur final.
-    Les données brutes sont fournies dans le contexte : {csv_data}.
+    Les données ou vous allez prendre un échantillon sont fournies dans le contexte : {dataset_info}.
     
     Cette tâche est activée quand un bouton (B2B ou B2C) est sélectionné et que des données
     structurées sont disponibles via le contexte de la tâche.
     
     Processus à suivre :
-    1. Analyser l'input utilisateur original pour comprendre son besoin  : {demande}
-    2. Examiner les données CSV fournies : {csv_data}
+    1. Analyser l'input utilisateur original pour comprendre son besoin  : {user_query}
+    2. Examiner un échantillon de données aléatoirement CSV fournies : {dataset_info}
     3. Extraire les insights clés et tendances significatives
-    4.**IMPORTANT : Utilise l'outil 'CSV File Creator' pour sauvegarder les données {csv_data} dans un fichier.**
     5. Corréler les données avec la demande utilisateur initiale
-    6. Synthétiser les findings en recommandations business
-    7. Intégrer le lien de téléchargement du fichier CSV fournies dans le contexte dans la réponse finale
+
     
     Priorité à l'interprétation métier des données techniques.
     La valeur ajoutée réside dans la transformation d'insights data en stratégies exploitables.
@@ -55,9 +377,7 @@ data_analysis_synthesis:
     - Une section de contextualisation de l'analyse
     - Une section de synthèse des insights clés extraits des données
     - Une section d'interprétation business des tendances identifiées
-    - Une section de recommandations stratégiques basées sur les données
-    - Mention explicite du fichier CSV avec lien : "📊 [Télécharger les données complètes](lien_csv)"
-    
+  
     L'agent doit choisir des titres de sections (## Titre) qui reflètent naturellement 
     les insights découverts et le type d'analyse B2B/B2C effectuée.
     
@@ -66,9 +386,8 @@ data_analysis_synthesis:
     - Ton analytique mais accessible
     - Utiliser des titres markdown appropriés (## Titre)  
     - Focus sur l'actionnable business
-    - Lien CSV obligatoire et bien visible
   agent: business_expert
   context: []  # Sera rempli dynamiquement avec les données CSV
-  guardrail: "Vérifier que la réponse inclut une analyse des données CSV, et contient un lien de téléchargement clairement visible"
-  markdown: true
   output_file: "analysis_response.md"
+  guardrail: Utiliser juste les colonnes du fichier csv
+
