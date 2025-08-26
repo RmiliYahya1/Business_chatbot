@@ -184,8 +184,6 @@ def handle_streaming_requests():
         def progress_generator():
             user_info = {'choice': user_choice, 'input': user_input}
             processor = Processor()
-
-            # Yield progress updates directly from processor
             for update in processor.kickoff(inputs=user_info):
                 yield f"data: {json.dumps(update)}\n\n"
 
@@ -204,7 +202,6 @@ def handle_streaming_requests():
             }
         )
 
-        # Disable buffering at the response level
         response.implicit_sequence_conversion = False
         return response
 
@@ -216,6 +213,5 @@ def handle_streaming_requests():
         )
 
 if __name__ == '__main__':
-    # Importer et initialiser l'event listener
     print("Initializing streaming event listener...")
     app.run(debug=True, port=3002, threaded=True, use_reloader=False)
