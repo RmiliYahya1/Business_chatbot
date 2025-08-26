@@ -5,15 +5,10 @@ import threading
 import uuid
 import queue
 import requests
-
 from business_chatbot.src.business_chatbot.business_flow import BusinessChatbotFlow as Processor
-
 from business_chatbot.src.business_chatbot.crew import BusinessChatbot
 from flask import Flask, jsonify, request, Response, stream_with_context
-
-
 from  flask_cors import CORS
-
 from business_chatbot.src.business_chatbot.tools.streaming_listener import flask_streaming_listener
 
 agents=BusinessChatbot()
@@ -71,128 +66,70 @@ def stream_response():
     data = request.get_json()
     user_input = data.get('input', '')
     user_id = data.get('userId', 'anonymous')
-    conversation_id = data.get('conversationId')  # facultatif côté front
+    conversation_id = data.get('conversationId')
     search_enabled = data.get('searchEnabled', False)
-    client_id = conversation_id or str(uuid.uuid4())  # run_id stable si fourni
+    client_id = conversation_id or str(uuid.uuid4())
 
     if not user_input.strip():
         return jsonify({'error': 'Input is required'}), 400
 
-
     @stream_with_context
     def generate():
         try:
-            # Enregistrer le client pour le streaming
-            flask_streaming_listener.register_client(client_id)
-
             # Envoyer le message de démarrage
             yield f"data: {json.dumps({'type': 'start', 'message': 'Initialisation de l IA...', 'client_id': client_id})}\n\n"
 
-            # Créer et exécuter le processor dans un thread séparé
+            # Exécuter le processor et attendre le résultat COMPLET
+            user_info = {
+                'choice': 'default',
+                'input': user_input,
+                'user_id': user_id,
+                'conversation_id': client_id,
+                'search_enabled': bool(search_enabled)
+            }
+            processor = Processor()
 
-            def run_processor():
-                try:
-                    user_info = {'choice': 'default', 'input': user_input, 'user_id': user_id, 'conversation_id': client_id,'search_enabled': bool(search_enabled),}
-                    processor = Processor()
+            # CHANGEMENT PRINCIPAL: Exécuter sans streaming intermédiaire
+            result = processor.kickoff(inputs=user_info)
 
-                    # Exécuter le flow (le streaming se fait via les event listeners)
-                    result = processor.kickoff(inputs=user_info)
+            # Extraire seulement la réponse finale
+            if hasattr(result, 'raw'):
+                final_response = str(result.raw)
+            else:
+                final_response = str(result)
 
-                    # Envoyer le résultat final
-                    final_data = {
-                        'type': 'final_result',
-                        'content': str(result.raw) if hasattr(result, 'raw') else str(result),
-                        'timestamp': time.time()
-                    }
+            # Maintenant streamer la réponse finale mot par mot pour l'effet visuel
+            words = final_response.split()
+            for i, word in enumerate(words):
+                if i == 0:
+                    token = word
+                else:
+                    token = " " + word
 
-                    if client_id in flask_streaming_listener.client_queues:
-                        flask_streaming_listener.client_queues[client_id].put(final_data)
+                chunk_data = {
+                    'type': 'chunk',
+                    'content': token,
+                    'timestamp': time.time()
+                }
+                yield f"data: {json.dumps(chunk_data)}\n\n"
+                time.sleep(0.03)  # Délai pour simuler le streaming naturel
 
-                except Exception as e:
-                    logger.error(f"Error in processor thread: {str(e)}")
-                    error_data = {
-                        'type': 'error',
-                        'message': f'Erreur lors du traitement: {str(e)}',
-                        'timestamp': time.time()
-                    }
-
-                    try:
-                        if client_id in flask_streaming_listener.client_queues:
-                            flask_streaming_listener.client_queues[client_id].put(error_data)
-                    except Exception as put_error:
-                        logger.error(f"Error putting error data to queue: {put_error}")
-
-            # Démarrer le processor en arrière-plan
-            processor_thread = threading.Thread(target=run_processor)
-            processor_thread.daemon = True
-            processor_thread.start()
-
-            # Streamer les événements depuis la queue
-            timeout_count = 0
-            max_timeout = 30  # 30 secondes de timeout total
-
-            while flask_streaming_listener.active_streams.get(client_id, False):
-                try:
-                    # Récupérer les données de la queue avec timeout
-                    event_data = flask_streaming_listener.client_queues[client_id].get(timeout=1)
-
-                    # Réinitialiser le compteur de timeout
-                    timeout_count = 0
-
-                    # Envoyer les données au client
-                    yield f"data: {json.dumps(event_data)}\n\n"
-
-                    # Vérifier si le streaming est terminé
-                    if event_data.get('type') in ['complete', 'final_result', 'error']:
-                        # Envoyer un message de fin
-                        end_data = {'type': 'end', 'timestamp': time.time()}
-                        yield f"data: {json.dumps(end_data)}\n\n"
-                        break
-
-                except queue.Empty:
-                    timeout_count += 1
-
-                    # Envoyer un heartbeat pour maintenir la connexion
-                    heartbeat_data = {
-                        'type': 'heartbeat',
-                        'timestamp': time.time(),
-                        'timeout_count': timeout_count
-                    }
-                    yield f"data: {json.dumps(heartbeat_data)}\n\n"
-
-                    # Timeout global
-                    if timeout_count >= max_timeout:
-                        timeout_data = {
-                            'type': 'timeout',
-                            'message': 'Délai d attente dépassé',
-                                                                 'timestamp': time.time()
-                        }
-                        yield f"data: {json.dumps(timeout_data)}\n\n"
-                        break
-
-                except Exception as e:
-                    logger.error(f"Error in streaming loop: {str(e)}")
-                    error_data = {
-                        'type': 'stream_error',
-                        'message': str(e),
-                        'timestamp': time.time()
-                    }
-                    yield f"data: {json.dumps(error_data)}\n\n"
-                    break
+            # Signal de fin
+            end_data = {
+                'type': 'final_result',
+                'content': final_response,
+                'timestamp': time.time()
+            }
+            yield f"data: {json.dumps(end_data)}\n\n"
 
         except Exception as e:
             logger.error(f"Error in stream generation: {str(e)}")
             error_data = {
-                'type': 'generation_error',
-                'message': str(e),
+                'type': 'error',
+                'message': f'Erreur lors du traitement: {str(e)}',
                 'timestamp': time.time()
             }
             yield f"data: {json.dumps(error_data)}\n\n"
-
-        finally:
-            # Nettoyer les ressources du client
-            flask_streaming_listener.unregister_client(client_id)
-            logger.info(f"Streaming completed for client {client_id}")
 
     return Response(
         generate(),
@@ -202,10 +139,9 @@ def stream_response():
             'Connection': 'keep-alive',
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Headers': 'Cache-Control',
-            'X-Accel-Buffering': 'no'  # Pour nginx
+            'X-Accel-Buffering': 'no'
         }
     )
-
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
