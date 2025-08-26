@@ -1,1 +1,4 @@
-{"mainCategory": "Coffee shop", "closedOn": "[\"Sunday\"]"}
+{
+  "mainCategory": "Coffee shop",
+  "closedOn": "Sunday"
+}

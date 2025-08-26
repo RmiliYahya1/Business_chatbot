@@ -76,10 +76,10 @@ def stream_response():
     @stream_with_context
     def generate():
         try:
-            # Envoyer le message de démarrage
+
             yield f"data: {json.dumps({'type': 'start', 'message': 'Initialisation de l IA...', 'client_id': client_id})}\n\n"
 
-            # Exécuter le processor et attendre le résultat COMPLET
+
             user_info = {
                 'choice': 'default',
                 'input': user_input,
@@ -89,16 +89,16 @@ def stream_response():
             }
             processor = Processor()
 
-            # CHANGEMENT PRINCIPAL: Exécuter sans streaming intermédiaire
+
             result = processor.kickoff(inputs=user_info)
 
-            # Extraire seulement la réponse finale
+
             if hasattr(result, 'raw'):
                 final_response = str(result.raw)
             else:
                 final_response = str(result)
 
-            # Maintenant streamer la réponse finale mot par mot pour l'effet visuel
+
             words = final_response.split()
             for i, word in enumerate(words):
                 if i == 0:
@@ -112,7 +112,7 @@ def stream_response():
                     'timestamp': time.time()
                 }
                 yield f"data: {json.dumps(chunk_data)}\n\n"
-                time.sleep(0.03)  # Délai pour simuler le streaming naturel
+                time.sleep(0.03)
 
             # Signal de fin
             end_data = {

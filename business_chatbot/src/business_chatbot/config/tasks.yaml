@@ -74,7 +74,7 @@ b2b_retreiving:
         {"input": "entreprises nécessitant vérification du type d'activité", "output": '{"categories": "", "description": "type verification"}'},
         {"input": "entreprises nécessitant attribution de catégorie", "output": '{"mainCategory": "", "description": "category assignment"}'},
 
-        # 🟡 REQUÊTES À MOTIFS RÉPÉTITIFS (20 exemples)
+        # REQUÊTES À MOTIFS RÉPÉTITIFS (20 exemples)
         # Motif : "Entreprises à [Ville]"
         {"input": "entreprises à Seattle", "output": '{"city": "Seattle"}'},
         {"input": "entreprises à Portland", "output": '{"city": "Portland"}'},
@@ -103,7 +103,7 @@ b2b_retreiving:
         {"input": "entreprises au Royaume-Uni", "output": '{"countryCode": "GB"}'},
         {"input": "entreprises au Japon", "output": '{"countryCode": "JP"}'},
 
-        # 🟢 REQUÊTES EN LANGAGE NATUREL HUMAIN (13 exemples - condensés pour l'espace)
+        # REQUÊTES EN LANGAGE NATUREL HUMAIN (13 exemples - condensés pour l'espace)
         {"input": "Je cherche de très bons restaurants dans le centre-ville de Paris, vous savez, le genre avec une excellente ambiance et une excellente cuisine que les locaux fréquentent vraiment", "output": '{"city": "Paris", "mainCategory": "Restaurant", "rating": 4, "address": "downtown", "description": "local atmosphere excellent"}'},
         {"input": "Pouvez-vous m'aider à trouver des hôtels de luxe à Manhattan ? J'ai besoin de quelque chose d'haut de gamme pour des clients d'affaires, de préférence avec des installations de conférence et un service cinq étoiles", "output": '{"city": "New York", "mainCategory": "Hotel", "rating": 5, "priceRange": "expensive", "address": "Manhattan", "description": "luxury upscale conference business"}'},
         {"input": "Je fais une étude de marché sur les cafés dans la région de Seattle - spécifiquement intéressé par les endroits qui se commercialisent activement et ont une clientèle solide", "output": '{"city": "Seattle", "mainCategory": "Coffee shop", "isSpendingOnAds": true, "reviews": 50, "description": "market research marketing"}'},
@@ -202,7 +202,7 @@ b2c_retreiving:
             {"input": "utilisateur 987654321098765432", "output": '{"userId": "987654321098765432"}'},
             {"input": "profil 456789012345678901", "output": '{"userId": "456789012345678901"}'},
 
-            # 🟠 REQUÊTES MULTI-CHAMPS COMPLEXES (35 exemples) - Requêtes avancées combinant plusieurs critères
+            # REQUÊTES MULTI-CHAMPS COMPLEXES (35 exemples) - Requêtes avancées combinant plusieurs critères
 
             # Démographie + Géographie (5 exemples)
             {"input": "femmes françaises", "output": '{"gender": "female", "currentCountry": "France"}'},
@@ -387,6 +387,7 @@ data_analysis_synthesis:
     - Utiliser des titres markdown appropriés (## Titre)  
     - Focus sur l'actionnable business
   agent: business_expert
-  context: []
-
+  context: []  # Sera rempli dynamiquement avec les données CSV
+  output_file: "analysis_response.md"
+  guardrail: Utiliser juste les colonnes du fichier csv
 

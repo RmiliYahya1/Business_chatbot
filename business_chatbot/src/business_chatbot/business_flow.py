@@ -6,6 +6,7 @@ import pandas as pd
 from crewai.flow.flow import Flow, start, router, listen
 import logging
 from crewai_tools.tools.csv_search_tool.csv_search_tool import CSVSearchTool
+from flask import jsonify
 import requests
 from pydantic import BaseModel
 from business_chatbot.src.business_chatbot.crew import BusinessChatbot, get_mem_service, SERPER_API_KEY
@@ -181,8 +182,8 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                 yield f"data: {json.dumps({'status': 'starting', 'message': 'Initialisation du processus d\'extraction B2B...', 'progress': 10})}\n\n"
 
                 # 1. Generate query with B2B crew
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'Génération de requête...', 'progress': 20})}\n\n"
                 query = self.business_chatbot.b2b_crew().kickoff(inputs=inputs_dict)
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Génération de requête...', 'progress': 20})}\n\n"
                 logger.info(f"B2B Query result: {query}")
                 yield f"data: {json.dumps({'status': 'processing', 'message': 'Requête générée avec succès', 'progress': 30})}\n\n"
 
@@ -202,7 +203,6 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                 yield f"data: {json.dumps({'status': 'processing', 'message': 'Envoyer la requête API pour récupérer des données...', 'progress': 40})}\n\n"
                 result = make_post_request(b2b_api_url, query_dict, headers, params)
                 yield f"data: {json.dumps({'status': 'processing', 'message': 'Requête API accompli', 'progress': 50})}\n\n"
-
                 if isinstance(result, str):
                     try:
                         result = json.loads(result)
@@ -215,7 +215,7 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                     "placeId", "name", "description", "isSpendingOnAds", "reviews", "rating",
                     "website", "mockEmail", "phone", "canClaim", "ownerId", "ownerName",
                     "ownerLink", "featuredImage", "mainCategory", "categories", "workdayTiming",
-                    "isTemporarilyClosed", "isPermanentlyClosed", "closedOn", "address",
+                    "isTemporarilyClosed", "isPermanentlyClosed","address","closedOn",
                     "link", "status", "priceRange", "featuredQuestion", "reviewsLink",
                     "latitude", "longitude", "plusCode", "ward", "street", "city",
                     "postalCode", "state", "countryCode", "timeZone", "cid", "dataId",
@@ -319,7 +319,7 @@ class BusinessChatbotFlow(Flow[UserChoice]):
         def generate_response():
             try:
                 logger.info("Starting B2C extraction...")
-                yield f"data: {json.dumps({'status': 'starting', 'message': 'Initialisation du processus d\'extraction B2...', 'progress': 10})}\n\n"
+                yield f"data: {json.dumps({'status': 'starting', 'message': 'Initialisation du processus d\'extraction B2C...', 'progress': 10})}\n\n"
                 time.sleep(0.5)
                 # 1. Générer la requête avec le crew B2C
                 yield f"data: {json.dumps({'status': 'processing', 'message': 'Génération de requête...', 'progress': 20})}\n\n"
@@ -336,13 +336,13 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                     try:
                         query_dict = json.loads(str(query))
                     except json.JSONDecodeError:
+                        yield f"data: {json.dumps({'status': 'error', 'message': '', 'progress': 35})}\n\n"
                         return
 
                 # 3. Make API request
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'Envoie la requête API pour récupérer des données...', 'progress': 40})}\n\n"
                 result = make_post_request(b2c_api_url, query_dict, headers, params)
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Envoie la requête API pour récupérer des données...', 'progress': 40})}\n\n"
                 yield f"data: {json.dumps({'status': 'processing', 'message': 'Requête API accompli', 'progress': 50})}\n\n"
-
                 if isinstance(result, str):
                     try:
                         result = json.loads(result)
@@ -379,7 +379,7 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                 yield f"data: {json.dumps({'status': 'processing', 'message': f'{len(records)} enregistrements valides trouvés.', 'progress': 65})}\n\n"
 
                 # 5. Create CSV
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'Création d\'un fichier CSV à partir des données traitées....', 'progress': 70})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Création d\'un fichier CSV à partir de données traitées...', 'progress': 70})}\n\n"
                 df = pd.DataFrame(records)
                 csv_data = df.to_csv(index=False, encoding='utf-8')
                 yield f"data: {json.dumps({'status': 'processing', 'message': 'Fichier CSV généré avec succès', 'progress': 75})}\n\n"
@@ -399,12 +399,12 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                 inputs_dict.update({
                                        'dataset_info': f"Dataset loaded with {len(df)} B2C records. Use the search tool to analyze a random sample of data."})
 
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'Début de l\'analyse experte des données...', 'progress': 85})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Début de l\'analyse des données...', 'progress': 85})}\n\n"
                 logger.info("Calling expert_crew2 for analysis...")
                 response = BusinessChatbot().expert_crew2().kickoff(inputs=inputs_dict)
-                yield f"data: {json.dumps({'status': 'processing', 'message': 'Analyse experte terminée', 'progress': 95})}\n\n"
+                yield f"data: {json.dumps({'status': 'processing', 'message': 'Analyse terminée', 'progress': 95})}\n\n"
 
-                yield f"data: {json.dumps({'status': 'completed', 'message': 'Extraction et analyse B2C terminées avec succès', 'progress': 100})}\n\n"
+                yield f"data: {json.dumps({'status': 'completed', 'message': 'Extraction et analyse B2B terminées avec succès', 'progress': 100})}\n\n"
 
                 # Send final result
                 final_result = {
