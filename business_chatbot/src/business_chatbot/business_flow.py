@@ -90,6 +90,7 @@ class BusinessChatbotFlow(Flow[UserChoice]):
         crew_name = "consultation_direct"
         agent_name = "business_expert"
 
+
         use_search = bool(getattr(self.state, "search_enabled", False))
 
 

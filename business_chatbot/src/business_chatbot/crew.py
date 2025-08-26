@@ -123,13 +123,64 @@ def log_storage_path() -> None:
 class BusinessChatbot:
     """BusinessChatbot crews"""
 
-    # Ces chemins restent des str (convention CrewBase)…
+    def _ensure_dynamic_tools_on_agent(self, agent):
+        """Attache RAG et Serper à l'agent passé, sans doublons."""
+        try:
+            current = list(getattr(agent, "tools", []) or [])
+        except Exception:
+            current = []
+
+        changed = False
+
+        # Attach RAG tool
+        if self._rag_tool is not None and self._rag_tool not in current:
+            current.append(self._rag_tool)
+            changed = True
+            logging.getLogger(__name__).info("   ➕ RAG tool attaché sur agent (patch cached).")
+
+        # Attach Serper if enabled and key present
+        if self._search_enabled and SERPER_API_KEY:
+            from crewai_tools import SerperDevTool
+            if not any(isinstance(t, SerperDevTool) for t in current):
+                try:
+                    current.append(SerperDevTool())
+                    changed = True
+                    logging.getLogger(__name__).info("   ➕ SerperDevTool attaché sur agent (patch cached).")
+                except Exception as e:
+                    logging.getLogger(__name__).warning("   ⚠️ Échec init SerperDevTool (patch): %s", e)
+        elif self._search_enabled and not SERPER_API_KEY:
+            logging.getLogger(__name__).warning("   ⚠️ SERPER_API_KEY manquant: Serper non attaché (patch).")
+
+        if changed:
+            try:
+                agent.tools = current
+            except Exception:
+                # fallback si .tools n’est pas assignable
+                try:
+                    agent.tools.clear();
+                    agent.tools.extend(current)
+                except Exception:
+                    pass
+
+        logging.getLogger(__name__).info("   → Tools sur agent (après patch): %d | %s",
+                                         len(getattr(agent, "tools", []) or []),
+                                         [type(t).__name__ for t in (getattr(agent, "tools", []) or [])])
+    def _patch_cached_business_expert(self):
+        """Récupère l'agent (potentiellement mis en cache par @agent) et applique les outils dynamiques."""
+        try:
+            agent_obj = self.business_expert()  # renvoie l'Agent (souvent déjà caché)
+            if agent_obj is not None:
+                self._ensure_dynamic_tools_on_agent(agent_obj)
+        except Exception as e:
+            logging.getLogger(__name__).debug(
+                "Patch cached agent impossible (peut être normal avant première création): %s", e)
+
+
     agents_config = "config/agents.yaml"
     tasks_config = "config/tasks.yaml"
 
     def __init__(self) -> None:
         super().__init__()
-        # …mais on charge explicitement les YAML dans des dicts (corrige l'erreur d'indexation)
         self._agents_cfg: Dict[str, Any] = _load_yaml_config(self.agents_config)
         self._tasks_cfg: Dict[str, Any] = _load_yaml_config(self.tasks_config)
 
@@ -141,11 +192,17 @@ class BusinessChatbot:
                      list(self._agents_cfg.keys()), list(self._tasks_cfg.keys()))
 
     # --------------------------- Setters -----------------------------------
-    def set_rag_tool(self, rag_tool: Any) -> None:
-        self._rag_tool = rag_tool
-
     def set_search_enabled(self, enabled: bool) -> None:
         self._search_enabled = bool(enabled)
+        logger.info("🔎 Web search (Serper) %s", "activé" if self._search_enabled else "désactivé")
+        # ⤵️ Patch immédiat de l'agent éventuellement déjà construit/caché
+        self._patch_cached_business_expert()
+
+    def set_rag_tool(self, rag_tool: Any) -> None:
+        self._rag_tool = rag_tool
+        logger.info("🔧 RAG tool défini: %s", type(rag_tool).__name__ if rag_tool else None)
+        # ⤵️ Patch immédiat de l'agent éventuellement déjà construit/caché
+        self._patch_cached_business_expert()
 
     # --------------------------- AGENTS ------------------------------------
     @agent
@@ -155,22 +212,15 @@ class BusinessChatbot:
         """
         tools = []
 
-        logger.info(f"🔧 Configuration business_expert:")
-        logger.info(f"   - RAG tool: {'✅ Activé' if self._rag_tool is not None else '❌ Désactivé'}")
-        logger.info(f"   - Search enabled: {'✅ Activé' if self._search_enabled else '❌ Désactivé'}")
-        logger.info(f"   - SERPER_API_KEY: {'✅ Présent' if SERPER_API_KEY else '❌ Manquant'}")
-
         if self._rag_tool is not None:
-            tools.append(self._rag_tool)
+            tools = [self._rag_tool]
             logger.info("   ➕ RAG tool ajouté")
 
         if self._search_enabled:
-            if SERPER_API_KEY:
                 serper_tool = SerperDevTool()
-                tools.append(serper_tool)
+                tools =[self._rag_tool,serper_tool]
                 logger.info("   ➕ SerperDevTool ajouté avec succès")
-            else:
-                logger.warning("   ⚠️ SERPER_API_KEY manquant : SerperDevTool non ajouté")
+
 
         cfg = self._agents_cfg.get("business_expert")
         if not isinstance(cfg, dict):
@@ -179,15 +229,16 @@ class BusinessChatbot:
                 "(ou format invalide)."
             )
         logger.info(f"  Total outils: {len(tools)} - {[type(tool).__name__ for tool in tools]}")
-        return Agent(
+        agent = Agent(
             config=cfg,
             llm=my_llm,
             allow_delegation=False,
             verbose=True,
-            tools=tools,
             respect_context_window=False,
             max_iter=3,
         )
+        self._ensure_dynamic_tools_on_agent(agent)
+        return agent
 
     @agent
     def b2b_specialist(self) -> Agent:
