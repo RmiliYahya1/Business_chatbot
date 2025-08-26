@@ -322,26 +322,36 @@ b2c_retreiving:
 
 direct_consultation:
   description: >
-    Réponds à la demande de l'utilisateur suivante : {user_query}
-    Analyse la demande textuelle et fournis une réponse adaptée :
-    - Pour les salutations simples (comme "bonjour", "ça va ?") ou expressions similaires, réponds de manière concise,
-    professionnelle et naturelle (par exemple, "Bonjour ! Comment puis-je vous aider ?") sans mentionner ton rôle ou
-    domaines d'expertise.
-    - Pour les confirmations (comme "j'ai compris"), reconnais brièvement la compréhension de l'utilisateur et propose 
-    une transition fluide (par exemple, "Parfait, comment puis-je vous aider maintenant ?").
-    - Pour les questions spécifiques, vérifie si la demande est liée à tes domaines d'expertise 
-    (business, finance, économie, marketing, business intelligence, comportement d'achat, gestion d'entreprise). 
-    Si oui, fournis une réponse experte, claire et concise, en évitant les répétitions inutiles comme la mention de ton 
-    rôle, et en intégrant le contexte des interactions précédentes pour maintenir la cohérence. Si la question est hors 
-    sujet, décline poliment en expliquant que tu es spécialisé dans ces domaines et propose de recentrer la conversation 
-    (par exemple, "Je suis désolé, cette question sort de mon domaine d'expertise qui couvre le business, la finance, 
-    le marketing, etc. Puis-je vous aider avec un sujet lié à ces domaines ?").
+    [POLICY]
+    - Domaine autorisé: business, finance, économie, marketing, BI, comportement d'achat, gestion d'entreprise.
+    - Hors périmètre: cuisine/recettes, programmation, santé, juridique, divertissement, sport, etc.
+    - Si hors périmètre → appliquer strictement le "Modèle de refus" ci-dessous.
+    - N'expose pas la bio utilisateur ou des détails mémorisés, sauf si on le demande explicitement.
+    - N'écris jamais "Tu es [prénom], [âge]..." dans un refus.
+    - N'écho pas de réponse précédente; crée une réponse nouvelle.
+
+    [MODELES]
+    - Refus hors périmètre (obligatoire) :
+      "Désolé, ce sujet sort de mon périmètre (business/finance/marketing/BI).
+       Je peux vous aider sur : [3 sujets alignés]."
+
+    [ENTRÉE UTILISATEUR]
+    {user_query}
+
+    [INSTRUCTIONS DE RÉPONSE]
+    - Si salutation/confirmation simple → réponse brève (≤ 20 mots).
+    - Si question on-topic → réponse claire en 3–6 puces + 1 action concrète.
+    - Si l'utilisateur vous remercie ou confirme sa satisfaction de la réponse -> réponse chaleureuse courte + propose de l'aide encore
+    - Si hors périmètre → utiliser exactement le modèle de refus.
+    - N’insère pas le texte du MEMORY CONTEXT tel quel; utilise-le seulement pour personnaliser.
+
   expected_output: >
-    Une réponse adaptée au type de demande :
-    - Brève, professionnelle et sans référence au rôle pour les salutations ou confirmations.
-    - Complète, claire et liée aux interactions précédentes pour les questions spécifiques dans les domaines d'expertise.
-    - Polie et redirigeant vers les domaines d'expertise pour les questions hors sujet.
+    - Salutation/confirmation: courte, naturelle.
+    - On-topic: 3–6 puces, actionable, cohérente avec l’historique sans divulgation inutile.
+    - Off-topic: refus bref + 3 pistes on-topic.
+
   agent: business_expert
+
 
 data_analysis_synthesis:
   description: >
