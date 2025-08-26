@@ -51,7 +51,7 @@ MODEL = os.getenv("MODEL")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 if not SERPER_API_KEY:
-    logger.warning("⚠️ SERPER_API_KEY est manquant : SerperDevTool ne pourra pas fonctionner.")
+    logger.warning("SERPER_API_KEY est manquant : SerperDevTool ne pourra pas fonctionner.")
 
 if not OPENAI_API_KEY:
     logger.warning("OPENAI_API_KEY est vide/non défini. Le LLM ne pourra pas répondre.")
@@ -105,11 +105,11 @@ def log_storage_path() -> None:
         for item in entries:
             item_path = os.path.join(storage_path, item)
             if os.path.isdir(item_path):
-                logger.info("📁 %s/", item)
+                logger.info(" %s/", item)
                 for subitem in os.listdir(item_path):
                     logger.info("   └── %s", subitem)
             else:
-                logger.info("📄 %s", item)
+                logger.info(" %s", item)
     except PermissionError:
         logger.warning("Permission refusée pour accéder à %s", storage_path)
     except Exception as e:
@@ -136,7 +136,7 @@ class BusinessChatbot:
         if self._rag_tool is not None and self._rag_tool not in current:
             current.append(self._rag_tool)
             changed = True
-            logging.getLogger(__name__).info("   ➕ RAG tool attaché sur agent (patch cached).")
+            logging.getLogger(__name__).info("RAG tool attaché sur agent (patch cached).")
 
         # Attach Serper if enabled and key present
         if self._search_enabled and SERPER_API_KEY:
@@ -145,11 +145,11 @@ class BusinessChatbot:
                 try:
                     current.append(SerperDevTool())
                     changed = True
-                    logging.getLogger(__name__).info("   ➕ SerperDevTool attaché sur agent (patch cached).")
+                    logging.getLogger(__name__).info(" SerperDevTool attaché sur agent (patch cached).")
                 except Exception as e:
-                    logging.getLogger(__name__).warning("   ⚠️ Échec init SerperDevTool (patch): %s", e)
+                    logging.getLogger(__name__).warning("Échec init SerperDevTool (patch): %s", e)
         elif self._search_enabled and not SERPER_API_KEY:
-            logging.getLogger(__name__).warning("   ⚠️ SERPER_API_KEY manquant: Serper non attaché (patch).")
+            logging.getLogger(__name__).warning("SERPER_API_KEY manquant: Serper non attaché (patch).")
 
         if changed:
             try:
@@ -194,13 +194,13 @@ class BusinessChatbot:
     # --------------------------- Setters -----------------------------------
     def set_search_enabled(self, enabled: bool) -> None:
         self._search_enabled = bool(enabled)
-        logger.info("🔎 Web search (Serper) %s", "activé" if self._search_enabled else "désactivé")
+        logger.info("Web search (Serper) %s", "activé" if self._search_enabled else "désactivé")
 
         self._patch_cached_business_expert()
 
     def set_rag_tool(self, rag_tool: Any) -> None:
         self._rag_tool = rag_tool
-        logger.info("🔧 RAG tool défini: %s", type(rag_tool).__name__ if rag_tool else None)
+        logger.info("RAG tool défini: %s", type(rag_tool).__name__ if rag_tool else None)
 
         self._patch_cached_business_expert()
 
@@ -214,12 +214,12 @@ class BusinessChatbot:
 
         if self._rag_tool is not None:
             tools = [self._rag_tool]
-            logger.info("   ➕ RAG tool ajouté")
+            logger.info("RAG tool ajouté")
 
         if self._search_enabled:
                 serper_tool = SerperDevTool()
                 tools =[self._rag_tool,serper_tool]
-                logger.info("   ➕ SerperDevTool ajouté avec succès")
+                logger.info(" SerperDevTool ajouté avec succès")
 
 
         cfg = self._agents_cfg.get("business_expert")
@@ -271,7 +271,7 @@ class BusinessChatbot:
     # ---------------------------- TASKS ------------------------------------
     @task
     def b2b_retreiving(self) -> Task:
-        # Conserve la clé YAML telle quelle si ton fichier s'appelle 'b2b_retreiving'
+        # Conserver la clé YAML 
         cfg = self._tasks_cfg.get("b2b_retreiving")
         if not isinstance(cfg, dict):
             raise KeyError(
