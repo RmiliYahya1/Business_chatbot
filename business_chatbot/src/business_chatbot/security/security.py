@@ -22,7 +22,7 @@ def test_db():
 
 
 app.config["SECRET_KEY"] = "supersecretkey"
-app.config["JWT_SECRET_KEY"] = "jwt-secret"  # change in production!
+app.config["JWT_SECRET_KEY"] = "jwt-secret"  
 CORS(app)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ def login():
     print(user)
     cursor.close()
 
-    if user and check_password_hash(user[1], password):  # user[1] = password column
+    if user and check_password_hash(user[1], password):  
         token = create_access_token(identity={"username": username})
         return jsonify(access_token=token), 200
 
