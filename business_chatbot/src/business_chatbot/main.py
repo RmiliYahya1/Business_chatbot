@@ -26,6 +26,7 @@ headers = {
 
 params = {'page': 10, 'size': 10, 'sortBy': '_score', 'direction': 'desc'}
 
+
 app= Flask(__name__)
 CORS(app)
 logging.basicConfig(level=logging.INFO)
