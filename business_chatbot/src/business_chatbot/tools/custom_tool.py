@@ -17,7 +17,6 @@ class CSVGenerator:
             self.output_dir = Path.home() / "Downloads"
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Move this method outside of __init__ and directly under the class
     def create_enhanced_download_section(
             self,
             data: List[Dict[str, Any]],

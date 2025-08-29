@@ -69,10 +69,6 @@ csv_tool = CSVFileCreatorTool()
 
 
 def _load_yaml_config(path_str: str) -> Dict[str, Any]:
-    """
-    Charge un YAML explicitement et renvoie un dict.
-    Corrige l'accès à self.agents_config['key'] quand self.agents_config était un str.
-    """
     path = Path(path_str)
     if not path.exists():
         raise FileNotFoundError(f"Fichier de configuration introuvable: {path}")
@@ -84,7 +80,6 @@ def _load_yaml_config(path_str: str) -> Dict[str, Any]:
 
 
 def log_storage_path() -> None:
-    """Logging (au lieu de print) du répertoire de stockage CrewAI."""
     storage_path = db_storage_path()
     path_exists = os.path.exists(storage_path)
     writable = os.access(storage_path, os.W_OK) if path_exists else False
@@ -124,7 +119,6 @@ class BusinessChatbot:
     """BusinessChatbot crews"""
 
     def _ensure_dynamic_tools_on_agent(self, agent):
-        """Attache RAG et Serper à l'agent passé, sans doublons."""
         try:
             current = list(getattr(agent, "tools", []) or [])
         except Exception:
@@ -132,13 +126,11 @@ class BusinessChatbot:
 
         changed = False
 
-        # Attach RAG tool
         if self._rag_tool is not None and self._rag_tool not in current:
             current.append(self._rag_tool)
             changed = True
             logging.getLogger(__name__).info("RAG tool attaché sur agent (patch cached).")
 
-        # Attach Serper if enabled and key present
         if self._search_enabled and SERPER_API_KEY:
             from crewai_tools import SerperDevTool
             if not any(isinstance(t, SerperDevTool) for t in current):
@@ -155,7 +147,6 @@ class BusinessChatbot:
             try:
                 agent.tools = current
             except Exception:
-                # fallback si .tools n’est pas assignable
                 try:
                     agent.tools.clear();
                     agent.tools.extend(current)
@@ -165,6 +156,8 @@ class BusinessChatbot:
         logging.getLogger(__name__).info("   → Tools sur agent (après patch): %d | %s",
                                          len(getattr(agent, "tools", []) or []),
                                          [type(t).__name__ for t in (getattr(agent, "tools", []) or [])])
+
+
     def _patch_cached_business_expert(self):
         """Récupère l'agent (potentiellement mis en cache par @agent) et applique les outils dynamiques."""
         try:
@@ -183,8 +176,6 @@ class BusinessChatbot:
         super().__init__()
         self._agents_cfg: Dict[str, Any] = _load_yaml_config(self.agents_config)
         self._tasks_cfg: Dict[str, Any] = _load_yaml_config(self.tasks_config)
-
-        # Options dynamiques
         self._rag_tool = None
         self._search_enabled = False
 
@@ -271,7 +262,7 @@ class BusinessChatbot:
     # ---------------------------- TASKS ------------------------------------
     @task
     def b2b_retreiving(self) -> Task:
-        # Conserver la clé YAML 
+        # Conserver la clé YAML
         cfg = self._tasks_cfg.get("b2b_retreiving")
         if not isinstance(cfg, dict):
             raise KeyError(

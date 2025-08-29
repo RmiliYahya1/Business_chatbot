@@ -86,8 +86,8 @@ class BusinessChatbotFlow(Flow[UserChoice]):
     @listen('default')
     def consultation_direct(self):
         user_query = self.state.input
-        user_id = getattr(self.state, "user_id", "anonymous")  # à passer depuis le front
-        run_id = getattr(self.state, "conversation_id", "session-" + str(uuid.uuid4()))  # idem
+        user_id = getattr(self.state, "user_id", "anonymous")
+        run_id = getattr(self.state, "conversation_id", "session-" + str(uuid.uuid4()))
         crew_name = "consultation_direct"
         agent_name = "business_expert"
 
