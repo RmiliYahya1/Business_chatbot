@@ -112,10 +112,11 @@ class BusinessChatbotFlow(Flow[UserChoice]):
 
         POLICY_BLOCK = """
         [POLICY]
-        - Domaine autorisé: business, finance, économie, marketing, BI, comportement d'achat, gestion d'entreprise.
-        - Hors périmètre: cuisine/recettes, programmation, santé, juridique, divertissement, sport.
-        - Si hors périmètre → appliquer strictement le "Modèle de refus".
-        - N'écho pas une réponse précédente; reformule toujours.
+         - Domaine autorisé: business, finance, économie, marketing, BI, comportement d'achat, gestion d'entreprise, résumé de conversation.
+         - Hors périmètre: cuisine/recettes, programmation, santé, juridique, divertissement, sport.
+         - Si hors périmètre → appliquer strictement le "Modèle de refus".
+         - N'écho pas une réponse précédente; reformule toujours.
+         - Si résumé demandé → utiliser la mémoire complète pour synthétiser la conversation.
 
         [MODELES]
         - Refus:
