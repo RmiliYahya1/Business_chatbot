@@ -143,7 +143,7 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                 inputs={'user_query': enhanced_query}
             )
 
-            logger.info(f"✅ Crew result obtenu: {type(crew_result)}")
+            logger.info(f" Crew result obtenu: {type(crew_result)}")
 
             assistant_msg = str(getattr(crew_result, "raw_output", getattr(crew_result, "result", crew_result)))
 
@@ -280,14 +280,6 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                         "csv": csv_data,
                         "headers": df.columns.tolist()
                     }
-                    assistant_text = str(response)
-                    user_text = self.state.input
-                    meta = {
-                        "segment": "b2b",
-                        "dataset_rows": len(df),
-                        "source": "csv_rag"
-                    }
-                    get_mem_service().add_interaction(u_id, a_id, r_id, user_text, assistant_text, metadata=meta)
                     yield f"data: {json.dumps(final_result)}\n\n"
                     yield f"data: {json.dumps({'status': 'completed', 'message': 'Extraction et analyse B2B terminées avec succès', 'progress': 100})}\n\n"
 
@@ -340,8 +332,8 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                         return
 
                 # 3. Make API request
-                result = make_post_request(b2c_api_url, query_dict, headers, params)
                 yield f"data: {json.dumps({'status': 'processing', 'message': 'Envoie la requête API pour récupérer des données...', 'progress': 40})}\n\n"
+                result = make_post_request(b2c_api_url, query_dict, headers, params)
                 yield f"data: {json.dumps({'status': 'processing', 'message': 'Requête API accompli', 'progress': 50})}\n\n"
                 if isinstance(result, str):
                     try:
@@ -395,7 +387,7 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                     description="Tool to search through the provided B2C consumer data"
                 )
 
-                BusinessChatbot().set_rag_tool(rag)  # Set the RAG tool
+                BusinessChatbot().set_rag_tool(rag)
                 inputs_dict.update({
                                        'dataset_info': f"Dataset loaded with {len(df)} B2C records. Use the search tool to analyze a random sample of data."})
 
@@ -413,15 +405,8 @@ class BusinessChatbotFlow(Flow[UserChoice]):
                     "csv": csv_data,
                     "headers": df.columns.tolist()
                 }
-                assistant_text = str(response)
-                user_text = self.state.input
-                meta = {
-                    "segment": "b2c",
-                    "dataset_rows": len(df),
-                    "source": "csv_rag"
-                }
-                get_mem_service().add_interaction(u_id, a_id, r_id, user_text, assistant_text, metadata=meta)
                 yield f"data: {json.dumps(final_result)}\n\n"
+                yield f"data: {json.dumps({'status': 'completed', 'message': 'Extraction et analyse B2C terminées avec succès', 'progress': 100})}\n\n"
 
             except Exception as e:
                 logger.error(f"Erreur d'extraction B2C: {str(e)}")
