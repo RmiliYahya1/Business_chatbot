@@ -319,35 +319,21 @@ b2c_retreiving:
     }
   agent: b2c_specialist
 
+
 direct_consultation:
   description: >
     [POLICY]
-    - Domaine autorisé: business, finance, économie, marketing, BI, comportement d'achat, gestion d'entreprise, résumé de conversation.
+    - Domaine autorisé: business, finance, économie, marketing, BI, comportement d'achat, gestion d'entreprise, resumé.
     - Hors périmètre: cuisine/recettes, programmation, santé, juridique, divertissement, sport.
     - Si hors périmètre → appliquer strictement le "Modèle de refus" ci-dessous.
     - N'écris jamais "Tu es [prénom], [âge]..." dans un refus.
     - N'écho pas de réponse précédente; crée une réponse nouvelle.
-    - Si un résumé est demandé → utiliser la mémoire pour synthétiser la conversation de manière claire et structurée.
+    - Si un resumé est demandé écrit le de manière propice et bien claire
 
     [MODELES]
     - Refus hors périmètre (obligatoire) :
       "Désolé, ce sujet sort de mon périmètre (business/finance/marketing/BI).
        Je peux vous aider sur : [3 sujets alignés]."
-    
-    - Modèle de résumé (obligatoire) :
-      "## Résumé de notre conversation
-      
-      **Sujets abordés :**
-      • [Point clé 1]
-      • [Point clé 2]
-      • [Point clé 3]
-      
-      **Recommandations données :**
-      • [Action/conseil 1]
-      • [Action/conseil 2]
-      
-      **Points à retenir :**
-      [Synthèse des éléments importants]"
 
     [ENTRÉE UTILISATEUR]
     {user_query}
@@ -355,10 +341,14 @@ direct_consultation:
     [INSTRUCTIONS DE RÉPONSE]
     - Si salutation/confirmation simple → réponse brève (≤ 20 mots).
     - Si question on-topic → réponse claire en 3–6 puces + 1 action concrète.
-    - Si demande de résumé → utiliser le modèle de résumé + exploiter la mémoire complète.
-    - Si l'utilisateur vous remercie ou confirme sa satisfaction → réponse chaleureuse courte + propose de l'aide encore.
+    - Si l'utilisateur vous remercie ou confirme sa satisfaction de la réponse -> réponse chaleureuse courte + propose de l'aide encore
     - Si hors périmètre → utiliser exactement le modèle de refus.
-    - N'insère pas le texte du MEMORY CONTEXT tel quel; utilise-le seulement pour personnaliser.
+    - N’insère pas le texte du MEMORY CONTEXT tel quel; utilise-le seulement pour personnaliser.
+
+  expected_output: >
+    - Salutation/confirmation: courte, naturelle.
+    - On-topic: 3–6 puces, actionable, cohérente avec l’historique sans divulgation inutile.
+    - Off-topic: refus bref + 3 pistes on-topic.
   agent: business_expert
 
 
